@@ -64,9 +64,23 @@ services:
       timeout: 10s
       retries: 5
 
+  api:
+    build: ./services/api
+    container_name: sf-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sf_user:sf_password@postgres:5432/software_factory
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8000:8000"
+
   agent-runner:
-    build:
-      context: ./services/agent-runner
+    build: ./services/agent-runner
     container_name: sf-agent-runner
     restart: unless-stopped
     depends_on:
@@ -86,10 +100,8 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: artifacts
-    ports:
-      - "8000:8000"
     volumes:
-      - ./artifacts:/app/artifacts
+      - ./artifacts:/artifacts
       - ./logs:/app/logs
       - ./datasets:/app/datasets
 

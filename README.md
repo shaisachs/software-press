@@ -8,8 +8,18 @@ To start:
 
 Next run:
 
-`curl -sik http://localhost:8000/hello-job`
+`docker exec -i sf-postgres psql -U sf_user -d software_factory < migrations/001_create_jobs.sql`
 
-This API request triggers the agent with the prompt "Write a two sentence blog intro about local-first AI tooling." Output will appear in `./artifacts/hello_job_output.md` as well as in the API response.
+Finally:
+
+```
+curl -X POST http://localhost:8000/jobs \
+    -H "Content-Type: application/json" \
+    -d '{
+        "prompt": "Write a hello world Python script"
+    }'
+```
+
+This API request triggers the agent with the prompt "Write a two sentence blog intro about local-first AI tooling." Output will appear in `./artifacts/` eventually.
 
 NB the `llama3.1:8b` model consumes about 4.6GB of disk space.
