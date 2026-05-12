@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16
-    container_name: sf-postgres
+    container_name: sp-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sf_user
-      POSTGRES_PASSWORD: sf_password
+      POSTGRES_USER: sp_user
+      POSTGRES_PASSWORD: sp_password
       POSTGRES_DB: software_factory
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sf_user"]
+      test: ["CMD-SHELL", "pg_isready -U sp_user"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7
-    container_name: sf-redis
+    container_name: sp-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -33,7 +33,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: sf-minio
+    container_name: sp-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -52,7 +52,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: sf-ollama
+    container_name: sp-ollama
     restart: unless-stopped
     ports:
       - "11434:11434"
@@ -66,7 +66,7 @@ services:
 
   api:
     build: ./services/api
-    container_name: sf-api
+    container_name: sp-api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -74,14 +74,14 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://sf_user:sf_password@postgres:5432/software_factory
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_factory
       REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
 
   agent-runner:
     build: ./services/agent-runner
-    container_name: sf-agent-runner
+    container_name: sp-agent-runner
     restart: unless-stopped
     depends_on:
       postgres:
@@ -93,7 +93,7 @@ services:
       ollama:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql://sf_user:sf_password@postgres:5432/software_factory
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_factory
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://ollama:11434
       MINIO_ENDPOINT: minio:9000
@@ -107,7 +107,7 @@ services:
 
   ollama-init:
     image: ollama/ollama:latest
-    container_name: sf-ollama-init
+    container_name: sp-ollama-init
     depends_on:
       ollama:
         condition: service_started

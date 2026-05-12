@@ -8,7 +8,7 @@ To start:
 
 Next run:
 
-`docker exec -i sf-postgres psql -U sf_user -d software_factory < migrations/001_create_jobs.sql`
+`docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 
 Finally:
 
