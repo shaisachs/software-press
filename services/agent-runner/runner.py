@@ -27,7 +27,7 @@ r = redis.Redis(
 def get_conn():
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "postgres"),
-        dbname=os.getenv("POSTGRES_DB", "software_factory"),
+        dbname=os.getenv("POSTGRES_DB", "software_press"),
         user=os.getenv("POSTGRES_USER", "sp_user"),
         password=os.getenv("POSTGRES_PASSWORD", "sp_password"),
     )

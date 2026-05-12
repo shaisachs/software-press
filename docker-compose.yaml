@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: sp_user
       POSTGRES_PASSWORD: sp_password
-      POSTGRES_DB: software_factory
+      POSTGRES_DB: software_press
     ports:
       - "5432:5432"
     volumes:
@@ -74,7 +74,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_factory
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
       REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
@@ -93,7 +93,7 @@ services:
       ollama:
         condition: service_started
     environment:
-      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_factory
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://ollama:11434
       MINIO_ENDPOINT: minio:9000
