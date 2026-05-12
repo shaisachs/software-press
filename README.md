@@ -1,4 +1,4 @@
-# software-factory
+# software-press
 
 Containerized agentic system for writing and reviewing software.
 
@@ -20,6 +20,6 @@ curl -X POST http://localhost:8000/jobs \
     }'
 ```
 
-This API request triggers the agent with the prompt "Write a two sentence blog intro about local-first AI tooling." Output will appear in `./artifacts/` eventually.
+Output will appear in `./artifacts/` eventually.
 
 NB the `llama3.1:8b` model consumes about 4.6GB of disk space.
