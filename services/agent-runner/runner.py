@@ -1,22 +1,18 @@
-import os
+# runtime/worker.py
+
 import json
+import subprocess
+from pathlib import Path
+from datetime import datetime
+import time
+import os
 import redis
 import psycopg2
-from datetime import datetime
-import httpx
-from minio import Minio
 
-
+MODEL = os.getenv("OPENCODE_MODEL", "llama3.1:8b")
+WORKSPACE_ROOT = Path("/workspace")
+ARTIFACT_ROOT = Path("/artifacts")
 QUEUE_NAME = "jobs"
-
-minio_client = Minio(
-    os.environ["MINIO_ENDPOINT"],
-    access_key=os.environ["MINIO_ACCESS_KEY"],
-    secret_key=os.environ["MINIO_SECRET_KEY"],
-    secure=False,
-)
-
-OLLAMA_BASE_URL = os.environ["OLLAMA_BASE_URL"]
 
 r = redis.Redis(
     host=os.getenv("REDIS_HOST", "redis"),
@@ -32,32 +28,13 @@ def get_conn():
         password=os.getenv("POSTGRES_PASSWORD", "sp_password"),
     )
 
-def run_job(prompt: str, artifact_path: str) -> str:
-    with httpx.Client(timeout=120) as client:
-        response = client.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json={
-                "model": "llama3.1:8b",
-                "prompt": prompt,
-                "stream": False,
-            },
-        )
+def dequeue_job():
+    prompt = None
+    artifact_path = None
 
-    data = response.json()
-
-    output = data.get("response", "")
-
-    os.makedirs("/app/artifacts", exist_ok=True)
-
-    artifact_path = "/app" + artifact_path
-
-    with open(artifact_path, "w") as f:
-        f.write(output)
-
-    return f"Agent output for prompt:\n\n{output}"
-
-while True:
     _, job_id = r.blpop(QUEUE_NAME)
+    if not job_id:
+        return (job_id, prompt, artifact_path)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -81,35 +58,68 @@ while True:
 
         prompt = cur.fetchone()[0]
         artifact_path = f"/artifacts/{job_id}.txt"
-
-        output = run_job(prompt, artifact_path)
-
-        with open(artifact_path, "w") as f:
-            f.write(output)
-
-        cur.execute(
-            """
-            UPDATE jobs
-            SET status = 'completed',
-                completed_at = NOW(),
-                artifact_path = %s
-            WHERE id = %s
-            """,
-            (artifact_path, job_id),
-        )
-
-        conn.commit()
-
     except Exception as e:
+        complete_job(job_id, 'failed', str(e))
+
+    return (job_id, prompt, artifact_path)
+
+def run_job(job_id, prompt, artifact_path):
+    workspace = WORKSPACE_ROOT
+
+    output_dir = ARTIFACT_ROOT / job_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    prompt_file = output_dir / "prompt.txt"
+    result_file = output_dir / "result.txt"
+
+    prompt_file.write_text(prompt)
+    opencode_model = "ollama/" + MODEL
+
+    cmd = [
+        "opencode",
+        "--dir",
+        str(workspace),
+        "--model",
+        opencode_model,
+        "run",
+        prompt,
+    ]
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+    )
+
+    ## TODO: move the output to the db instead? maybe we don't need artifacts?
+    result_file.write_text(result.stdout + "\n\n" + result.stderr)
+
+def complete_job(job_id, status, error_desc):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
         cur.execute(
             """
             UPDATE jobs
-            SET status = 'failed',
+            SET status = %s,
                 error = %s,
                 completed_at = NOW()
             WHERE id = %s
             """,
-            (str(e), job_id),
+            (status, error_desc, job_id),
         )
 
         conn.commit()
+    except Exception as e:
+        print("Error completing job! " + e)
+
+while True:
+    ## TODO: proper data model
+    job_id, prompt, artifact_path = dequeue_job()
+
+    if job_id:
+        run_job(job_id, prompt, artifact_path)
+        complete_job(job_id, 'completed', None)
+
+    time.sleep(2)
