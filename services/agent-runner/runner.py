@@ -70,7 +70,7 @@ def run_job(job_id, prompt, artifact_path):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     prompt_file = output_dir / "prompt.txt"
-    result_file = output_dir / "result.txt"
+    output_file = output_dir / "output.txt"
 
     prompt_file.write_text(prompt)
     opencode_model = "opencode/big-pickle" # "sp-ollama/" + MODEL
@@ -80,18 +80,18 @@ def run_job(job_id, prompt, artifact_path):
         "--dir", str(workspace),
         "--model", opencode_model,
         "run",
-        "--agent", "build"
+        "--agent", "build",
         prompt
     ]
 
-    result = subprocess.run(
+    output = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
     )
 
     ## TODO: move the output to the db instead? maybe we don't need artifacts?
-    result_file.write_text(result.stdout + "\n\n" + result.stderr)
+    output_file.write_text(output.stdout + "\n\n" + output.stderr)
 
 def complete_job(job_id, status, error_desc):
     conn = get_conn()
