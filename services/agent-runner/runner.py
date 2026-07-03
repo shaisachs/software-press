@@ -81,8 +81,7 @@ def run_job(job_id, prompt, artifact_path):
         "--model", opencode_model,
         "run",
         "--agent", "build"
-        prompt,
-        "--dangerously-skip-permissions"
+        prompt
     ]
 
     result = subprocess.run(
