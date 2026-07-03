@@ -17,5 +17,12 @@
       }
     }
   },
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "read": "allow",
+    "grep": "allow",
+    "glob": "allow"
+  },
   "autoupdate": false
 }

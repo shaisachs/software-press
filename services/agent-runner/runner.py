@@ -73,16 +73,16 @@ def run_job(job_id, prompt, artifact_path):
     result_file = output_dir / "result.txt"
 
     prompt_file.write_text(prompt)
-    opencode_model = "ollama/" + MODEL
+    opencode_model = "opencode/big-pickle" # "sp-ollama/" + MODEL
 
     cmd = [
         "opencode",
-        "--dir",
-        str(workspace),
-        "--model",
-        opencode_model,
+        "--dir", str(workspace),
+        "--model", opencode_model,
         "run",
+        "--agent", "build"
         prompt,
+        "--dangerously-skip-permissions"
     ]
 
     result = subprocess.run(
