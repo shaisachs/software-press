@@ -63,6 +63,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    environment:
+      OLLAMA_CONTEXT_LENGTH: 65536
 
   api:
     build: ./services/api
