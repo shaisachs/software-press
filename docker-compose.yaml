@@ -82,7 +82,6 @@ services:
   agent-runner:
     build: ./services/agent-runner
     container_name: sp-agent-runner
-    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,18 +91,23 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
-    environment:
-      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
-      REDIS_URL: redis://redis:6379
-      OLLAMA_BASE_URL: http://ollama:11434
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: artifacts
+    restart: unless-stopped
     volumes:
       - ./artifacts:/artifacts
       - ./logs:/app/logs
       - ./datasets:/app/datasets
+      - ./workspaces:/workspace
+    environment:
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
+      REDIS_URL: redis://redis:6379
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OPENCODE_MODEL: llama3.1:8b
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: artifacts
+      WORKSPACE_ROOT: /workspace
+      ARTIFACT_ROOT: /artifacts
 
   ollama-init:
     image: ollama/ollama:latest

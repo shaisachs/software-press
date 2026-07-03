@@ -1,0 +1,6 @@
+{
+  "sp-ollama": {
+    "type": "api",
+    "key": "abcd1234"
+  }
+}
