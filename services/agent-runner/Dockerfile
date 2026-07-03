@@ -19,7 +19,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 COPY . .
-RUN mkdir -p ~/.config/opencode && \
+
+RUN mkdir -p ~/.local/share/opencode && \
+    mv opencode-auth.json ~/.local/share/opencode/auth.json && \
+    mkdir -p ~/.config/opencode && \
     mv opencode-config.json ~/.config/opencode/config.json
 
 CMD ["python3", "runner.py"]

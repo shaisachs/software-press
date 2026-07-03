@@ -1,3 +1,4 @@
 models/
 artifacts/
 logs/
+.DS_Store
