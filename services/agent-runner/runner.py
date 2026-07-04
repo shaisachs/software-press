@@ -9,7 +9,7 @@ import os
 import redis
 import psycopg2
 
-MODEL = os.getenv("OPENCODE_MODEL", "llama3.1:8b")
+MODEL = os.getenv("OPENCODE_MODEL", "qwen3.5:9b")
 WORKSPACE_ROOT = Path("/workspace")
 ARTIFACT_ROOT = Path("/artifacts")
 QUEUE_NAME = "jobs"

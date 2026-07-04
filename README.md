@@ -12,9 +12,9 @@ Next run:
 
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 
-NB the `llama3.1:8b` model consumes about 4.6GB of disk space. The first `up` will download the model which will take a while.
+NB the `qwen3.5:9b` model consumes about several 7GB of disk space. The first `up` will download the model which will take a while.
 
-NB2 As currently written the agent actually runs the Big Pickle model, which is cloud-based. Llama 3.1 is quite old and limited, we've just wired it up to demonstrate that it's possible to run a local model. Eventually we'll run on more heavy-duty hardware that's capable of running something more substantial like Kimi.
+NB2 As currently written the agent actually runs the Big Pickle model, which is cloud-based. We're still working on experimenting with Qwen 3.5 to replace Big Pickle.
 
 ## Usage
 
@@ -47,7 +47,7 @@ Test ollama connectivity from within the sp-agent-runner container:
 
 ```
 curl http://ollama:11434/api/generate -d '{
-  "model": "llama3.1:8b",
+  "model": "qwen3.5:9b",
   "prompt": "Write a hello world poem",
   "stream": false
 }'
