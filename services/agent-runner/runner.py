@@ -32,7 +32,13 @@ def dequeue_job():
     prompt = None
     artifact_path = None
 
-    _, job_id = r.blpop(QUEUE_NAME)
+    try:
+        _, job_id = r.blpop(QUEUE_NAME)
+    except redis.exceptions.TimeoutError:
+        return (None, prompt, artifact_path)
+    except redis.exceptions.RedisError:
+        return (None, prompt, artifact_path)
+
     if not job_id:
         return (job_id, prompt, artifact_path)
 
