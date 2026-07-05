@@ -47,7 +47,7 @@ Test ollama connectivity from within the sp-agent-runner container:
 
 ```
 curl http://ollama:11434/api/generate -d '{
-  "model": "qwen3.5:9b",
+  "model": "llama3.2:3b",
   "prompt": "Write a hello world poem",
   "stream": false
 }'
