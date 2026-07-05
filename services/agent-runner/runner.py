@@ -70,34 +70,37 @@ def dequeue_job():
     return (job_id, prompt, artifact_path)
 
 def run_job(job_id, prompt, artifact_path):
-    workspace = WORKSPACE_ROOT
+    try:
+        workspace = WORKSPACE_ROOT
 
-    output_dir = ARTIFACT_ROOT / job_id
-    output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = ARTIFACT_ROOT / job_id
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    prompt_file = output_dir / "prompt.txt"
-    output_file = output_dir / "output.txt"
+        prompt_file = output_dir / "prompt.txt"
+        output_file = output_dir / "output.txt"
 
-    prompt_file.write_text(prompt)
-    opencode_model = "opencode/big-pickle" # "sp-ollama/" + MODEL
+        prompt_file.write_text(prompt)
+        opencode_model = "sp-ollama/" + MODEL
 
-    cmd = [
-        "opencode",
-        "--dir", str(workspace),
-        "--model", opencode_model,
-        "run",
-        "--agent", "build",
-        prompt
-    ]
+        cmd = [
+            "opencode",
+            "--dir", str(workspace),
+            "--model", opencode_model,
+            "run",
+            "--agent", "build",
+            prompt
+        ]
 
-    output = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-    )
+        output = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
 
-    ## TODO: move the output to the db instead? maybe we don't need artifacts?
-    output_file.write_text(output.stdout + "\n\n" + output.stderr)
+        ## TODO: move the output to the db instead? maybe we don't need artifacts?
+        output_file.write_text(output.stdout + "\n\n" + output.stderr)
+    except Exception as e:
+        print("Error running job! " + e)
 
 def complete_job(job_id, status, error_desc):
     conn = get_conn()
