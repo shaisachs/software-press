@@ -19,6 +19,12 @@
         },
         "llama3.2:3b": {
           "name": "Llama 3.2"
+        },
+        "codegemma:2b": {
+          "name": "CodeGemma"
+        },
+        "gemma4:e2b": {
+          "name": "Gemma 4"
         }
       }
     }
