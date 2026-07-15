@@ -2,7 +2,7 @@
 
 ## Setup:
 
-Containerized agentic system for writing and reviewing software.
+Containerized agentic system for writing and reviewing software. Uses OpenCode and Ollama with qwen2.5:0.5b. 
 
 To start:
 
@@ -12,9 +12,7 @@ Next run:
 
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 
-NB the `llama3.1:8b` model consumes about 4.6GB of disk space. The first `up` will download the model which will take a while.
-
-NB2 As currently written the agent actually runs the Big Pickle model, which is cloud-based. Llama 3.1 is quite old and limited, we've just wired it up to demonstrate that it's possible to run a local model. Eventually we'll run on more heavy-duty hardware that's capable of running something more substantial like Kimi.
+NB the first `up` command `up` will download the model which will take a while.
 
 ## Usage
 
@@ -24,7 +22,7 @@ To enqueue a job:
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
     -d '{
-        "prompt": "Write a hello world Python script and save it to hello.py"
+        "prompt": "Write a hello world Python script and save it to helloworld.py"
     }'
 ```
 
@@ -47,7 +45,7 @@ Test ollama connectivity from within the sp-agent-runner container:
 
 ```
 curl http://ollama:11434/api/generate -d '{
-  "model": "llama3.1:8b",
+  "model": "qwen2.5:0.5b",
   "prompt": "Write a hello world poem",
   "stream": false
 }'
@@ -56,7 +54,7 @@ curl http://ollama:11434/api/generate -d '{
 Test opencode from within the sp-agent-runner container:
 
 ```
-opencode --dir /workspace --model opencode/big-pickle run "Write a poem about penguins to penguins.txt."
+opencode --dir /workspace --model qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."
 ```
 
-The poem should appear in `/workspace/penguins.txt`.
+The poem should appear in `./workspace/penguins.txt`.

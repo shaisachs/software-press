@@ -11,7 +11,7 @@ do
   sleep 2
 done
 
-MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:0.5b}"
 
 if ollama list | grep -q "$MODEL"; then
   echo "Model already installed: $MODEL"
