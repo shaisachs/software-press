@@ -9,7 +9,8 @@ import os
 import redis
 import psycopg2
 
-MODEL = os.getenv("OPENCODE_MODEL", "qwen2.5:0.5b")
+PROVIDER = os.getenv("OPENCODE_PROVIDER", "deepseek")
+MODEL = os.getenv("OPENCODE_MODEL", "deepseek-v4-flash")
 WORKSPACE_ROOT = Path("/workspace")
 ARTIFACT_ROOT = Path("/artifacts")
 QUEUE_NAME = "jobs"
@@ -80,7 +81,7 @@ def run_job(job_id, prompt, artifact_path):
         output_file = output_dir / "output.txt"
 
         prompt_file.write_text(prompt)
-        opencode_model = "sp-ollama/" + MODEL
+        opencode_model = PROVIDER + "/" + MODEL
 
         cmd = [
             "opencode",
