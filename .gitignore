@@ -3,3 +3,4 @@ artifacts/
 logs/
 .DS_Store
 workspaces/
+.env
