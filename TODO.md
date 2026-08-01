@@ -1,2 +1,2 @@
 - [ ] allow the /jobs API to intake a provider and model so the defaults can be overridden
-- [ ] mount deepseek api keys safely
+- [x] mount deepseek api keys safely

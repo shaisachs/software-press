@@ -1,8 +1,10 @@
 # software-press
 
+Containerized agentic system for writing and reviewing software.
+
 ## Setup:
 
-Containerized agentic system for writing and reviewing software. Uses OpenCode and Ollama with qwen2.5:0.5b. 
+Provide your Docker API key in `.env`.
 
 To start:
 

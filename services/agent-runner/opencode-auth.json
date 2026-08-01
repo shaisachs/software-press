@@ -5,6 +5,8 @@
   },
   "deepseek": {
     "type": "api",
-    "key": "abcd1234"
+    "options": {
+      "apiKey": "{env:DEEPSEEK_API_KEY}"
+    }
   }
 }
