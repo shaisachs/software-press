@@ -4,7 +4,8 @@ Containerized agentic system for writing and reviewing software.
 
 ## Setup:
 
-Provide your Docker API key in `.env`.
+* Provide your Docker API key in `.env`.
+* Copy the SSH private key you use to access your git remote server into `services/agent-runner/id_rsa`.
 
 To start:
 
