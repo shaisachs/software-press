@@ -95,6 +95,8 @@ services:
       WORKSPACE_ROOT: /workspace
       ARTIFACT_ROOT: /artifacts
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GIT_EMAIL: ${GIT_EMAIL}
+      GIT_NAME: ${GIT_NAME}
 
   ollama-init:
     image: ollama/ollama:latest
