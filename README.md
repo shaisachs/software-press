@@ -1,18 +1,20 @@
 # software-press
 
+Containerized agentic system for writing and reviewing software.
+
 ## Setup:
 
-Containerized agentic system for writing and reviewing software. Uses OpenCode and Ollama with qwen2.5:0.5b. 
+Provide your Docker API key in `.env`.
 
 To start:
 
 `docker compose up`
 
-Next run:
+The first time you spin up the system, run:
 
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 
-NB the first `up` command `up` will download the model which will take a while.
+NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
 ## Usage
 
@@ -36,8 +38,19 @@ When the job completes, you should see:
 * Artifacts from the job in `artifacts/{job_id}` - e.g. `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/prompt.txt` and `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/output.txt`.
 * Files written by the job in `workspaces/` - e.g. `workspaces/hello.py` in this case.
 
-
 Output will appear in `./artifacts/` eventually.
+
+## Models in use
+
+We have configured two providers and three models:
+
+* Ollama - Qwen 2.5 0.5B
+* Deepseek - Flash v4
+* Deepseek - Pro v4
+
+The Qwen model is quite underpowered so it is not recommended for daily coding, but it is suitable for testing Ollama connectivity. With sufficient hardware you can run a more powerful local model.
+
+The Deepseek models require API keys. Flash is recommended for lightweight tasks, Pro for more heavy-duty tasks. Flash is the default.
 
 ## Debugging
 
@@ -54,7 +67,7 @@ curl http://ollama:11434/api/generate -d '{
 Test opencode from within the sp-agent-runner container:
 
 ```
-opencode --dir /workspace --model qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."
+opencode --dir /workspace --model sp-ollama/qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."
 ```
 
 The poem should appear in `./workspace/penguins.txt`.

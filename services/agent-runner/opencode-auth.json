@@ -2,5 +2,11 @@
   "sp-ollama": {
     "type": "api",
     "key": "abcd1234"
+  },
+  "deepseek": {
+    "type": "api",
+    "options": {
+      "apiKey": "{env:DEEPSEEK_API_KEY}"
+    }
   }
 }

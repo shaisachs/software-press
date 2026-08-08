@@ -86,13 +86,15 @@ services:
       DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://ollama:11434/v1
-      OPENCODE_MODEL: qwen2.5:0.5b
+      OPENCODE_PROVIDER: deepseek
+      OPENCODE_MODEL: deepseek-v4-flash
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: artifacts
       WORKSPACE_ROOT: /workspace
       ARTIFACT_ROOT: /artifacts
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
 
   ollama-init:
     image: ollama/ollama:latest
