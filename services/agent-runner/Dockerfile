@@ -24,7 +24,7 @@ RUN mkdir -p ~/.local/share/opencode && \
     mv opencode-auth.json ~/.local/share/opencode/auth.json && \
     mkdir -p ~/.config/opencode && \
     mv opencode-config.json ~/.config/opencode/config.json && \
-    mkdir -b ~/.ssh && \
+    mkdir -p ~/.ssh && \
     chmod 700 ~/.ssh && \
     mv id_rsa ~/.ssh && \
     chmod 600 ~/.ssh/id_rsa
