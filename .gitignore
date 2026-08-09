@@ -5,3 +5,4 @@ logs/
 workspaces/
 .env
 services/agent-runner/id_rsa
+__pycache__
