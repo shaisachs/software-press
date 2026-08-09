@@ -81,6 +81,8 @@ services:
       ollama:
         condition: service_started
     restart: unless-stopped
+    ports:
+      - "8001:8000"
     volumes:
       - ./artifacts:/artifacts
       - ./logs:/app/logs
@@ -99,6 +101,7 @@ services:
       WORKSPACE_ROOT: /workspace
       ARTIFACT_ROOT: /artifacts
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GH_TOKEN: ${GH_TOKEN}
 
   ollama-init:
     image: ollama/ollama:latest

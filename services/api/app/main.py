@@ -59,7 +59,9 @@ def get_job(job_id: str):
             prompt,
             status,
             artifact_path,
-            error
+            error,
+            pr_number,
+            issue_number
         FROM jobs
         WHERE id = %s
         """,
@@ -77,4 +79,6 @@ def get_job(job_id: str):
         "status": row[2],
         "artifact_path": row[3],
         "error": row[4],
+        "pr_number": row[5],
+        "issue_number": row[6],
     }
