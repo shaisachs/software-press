@@ -67,7 +67,11 @@ services:
       - "8000:8000"
 
   agent-runner:
-    build: ./services/agent-runner
+    build:
+      context: ./services/agent-runner
+      args:
+        GIT_NAME: ${GIT_NAME}
+        GIT_EMAIL: ${GIT_EMAIL}
     container_name: sp-agent-runner
     depends_on:
       postgres:

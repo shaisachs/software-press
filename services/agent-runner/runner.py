@@ -72,34 +72,43 @@ def dequeue_job():
 
 def run_job(job_id, prompt, artifact_path):
     try:
-        workspace = WORKSPACE_ROOT
+        workspace = str(WORKSPACE_ROOT)
 
         output_dir = ARTIFACT_ROOT / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
         prompt_file = output_dir / "prompt.txt"
-        output_file = output_dir / "output.txt"
+        output_file_path = output_dir / "output.txt"
 
         prompt_file.write_text(prompt)
+
         opencode_model = PROVIDER + "/" + MODEL
 
-        cmd = [
-            "opencode",
-            "--dir", str(workspace),
-            "--model", opencode_model,
-            "run",
-            "--agent", "build",
-            prompt
+        commands = [
+            [
+                "opencode",
+                "--dir", workspace,
+                "--model", opencode_model,
+                "run",
+                "--agent", "build",
+                prompt
+            ],
+            [ "git", "add", "-A" ],
+            [ "git", "commit" ],
+            [ "git", "push" ]
         ]
 
-        output = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-        )
-
         ## TODO: move the output to the db instead? maybe we don't need artifacts?
-        output_file.write_text(output.stdout + "\n\n" + output.stderr)
+        with open(output_file_path, "w", encoding="utf-8") as output_file:
+            for cmd in commands:
+                output = subprocess.run(
+                    cmd,
+                    cwd=workspace,
+                    capture_output=True,
+                    text=True,
+                )
+
+                output_file.write(output.stdout + "\n\n" + output.stderr)
     except Exception as e:
         print("Error running job! " + e)
 

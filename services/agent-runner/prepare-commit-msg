@@ -1,0 +1,28 @@
+#!/bin/sh
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Only run if no manual message was passed (-m)
+if [ -z "$COMMIT_SOURCE" ]; then
+  # Stop if nothing is staged
+  if git diff --cached --quiet; then
+    exit 0
+  fi
+
+  echo "🤖 OpenCode is generating your commit message..."
+  STAGED_DIFF=$(git diff --cached)
+
+  AI_MSG=$(opencode run --model deepseek/deepseek-v4-flash "Review these staged changes and write a brief, high-quality Git commit message following Conventional Commits (e.g., feat:, fix:). Do not include explanations, quotes, markdown formatting, or introductory text. Output ONLY the raw commit message text: $STAGED_DIFF")
+
+  if [ ! -z "$AI_MSG" ]; then
+    # 1. Write the message to the temporary file
+    echo "$AI_MSG" > "$COMMIT_MSG_FILE"
+    echo "✅ Commit message attached by OpenCode!"
+    
+    # 2. Tell Git to finish the commit using this file right now, bypassing the editor step
+    exec git commit -F "$COMMIT_MSG_FILE"
+  else
+    echo "⚠️ OpenCode failed to generate a message."
+  fi
+fi
