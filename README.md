@@ -6,6 +6,7 @@ Containerized agentic system for writing and reviewing software.
 
 * Provide your Docker API key, and your name/email for git commits, in `.env`.
 * Copy the SSH private key you use to access your git remote server into `services/agent-runner/id_rsa`.
+* Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces`
 
 To start:
 
@@ -38,22 +39,7 @@ Response:
 When the job completes, you should see:
 * Artifacts from the job in `artifacts/{job_id}` - e.g. `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/prompt.txt` and `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/output.txt`.
 * Files written by the job in `workspaces/` - e.g. `workspaces/hello.py` in this case.
-
-Output will appear in `./artifacts/` eventually.
-
-To write code, first clone your repo into `workspaces`, then prompt as desired:
-
-```
-cd workspaces
-git clone git@github.com:example/foobar.git
-curl -X POST http://localhost:8000/jobs \
-    -H "Content-Type: application/json" \
-    -d '{
-        "prompt": "Write a hello world Python script in foobar/, then commit and push."
-    }'
-```
-
-Alternatively, you can commit directly from the agent-runner container; opencode is configured to write the commit message for you.
+* Code committed and pushed to github, with the commit message supplied by opencode and deepseek/deepseek-v4-flash
 
 ## Models in use
 

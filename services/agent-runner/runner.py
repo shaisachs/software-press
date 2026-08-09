@@ -72,7 +72,7 @@ def dequeue_job():
 
 def run_job(job_id, prompt, artifact_path):
     try:
-        workspace = WORKSPACE_ROOT
+        workspace = str(WORKSPACE_ROOT)
 
         output_dir = ARTIFACT_ROOT / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -87,14 +87,15 @@ def run_job(job_id, prompt, artifact_path):
         commands = [
             [
                 "opencode",
-                "--dir", str(workspace),
+                "--dir", workspace,
                 "--model", opencode_model,
                 "run",
                 "--agent", "build",
                 prompt
             ],
             [ "git", "add", "-A" ],
-            [ "git", "commit" ]
+            [ "git", "commit" ],
+            [ "git", "push" ]
         ]
 
         ## TODO: move the output to the db instead? maybe we don't need artifacts?
@@ -102,7 +103,7 @@ def run_job(job_id, prompt, artifact_path):
             for cmd in commands:
                 output = subprocess.run(
                     cmd,
-                    cwd=str(workspace),
+                    cwd=workspace,
                     capture_output=True,
                     text=True,
                 )
