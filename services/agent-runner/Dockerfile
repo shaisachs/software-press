@@ -23,6 +23,8 @@ COPY . .
 ARG GIT_NAME
 ARG GIT_EMAIL
 
+# TODO: create a normal user so we're not doing everything as root
+# TODO: refactor into a bootstrap.sh; pull ssh-keyscan into an early layer so it's cached
 RUN mkdir -p ~/.local/share/opencode && \
     mv opencode-auth.json ~/.local/share/opencode/auth.json && \
     mkdir -p ~/.config/opencode && \
@@ -33,6 +35,10 @@ RUN mkdir -p ~/.local/share/opencode && \
     chmod 600 ~/.ssh/id_rsa && \
     ssh-keyscan -H github.com >> ~/.ssh/known_hosts && \
     git config --global user.name "$GIT_NAME" && \
-    git config --global user.email "$GIT_EMAIL"
+    git config --global user.email "$GIT_EMAIL" && \
+    mkdir -p ~/.git_templates/hooks && \
+    mv prepare-commit-msg ~/.git_templates/hooks/ && \
+    chmod +x ~/.git_templates/hooks/prepare-commit-msg && \
+    git config --global core.hooksPath ~/.git_templates/hooks
 
 CMD ["python3", "runner.py"]
