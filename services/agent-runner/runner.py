@@ -12,7 +12,7 @@ from gh import ensure_gh_auth, fetch_issue_text
 
 PROVIDER = os.getenv("OPENCODE_PROVIDER", "deepseek")
 MODEL = os.getenv("OPENCODE_MODEL", "deepseek-v4-flash")
-WORKSPACE_ROOT = Path("/workspace")
+WORKSPACE_ROOT = Path("/workspaces")
 ARTIFACT_ROOT = Path("/artifacts")
 QUEUE_NAME = "jobs"
 
@@ -87,10 +87,10 @@ def dequeue_job():
 
     return (job_id, prompt, artifact_path, issue_number)
 
-def cmd_run(cmd, workspace, output_file):
+def cmd_run(cmd, workspaces, output_file):
     result = subprocess.run(
         cmd,
-        cwd=workspace,
+        cwd=workspaces,
         capture_output=True,
         text=True,
     )
@@ -100,16 +100,16 @@ def cmd_run(cmd, workspace, output_file):
     output_file.write("\n\n")
     return result
 
-def get_default_branch(workspace):
+def get_default_branch(workspaces):
     subprocess.run(
         ["git", "remote", "set-head", "origin", "-a"],
-        cwd=workspace,
+        cwd=workspaces,
         capture_output=True,
         text=True,
     )
     result = subprocess.run(
         ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-        cwd=workspace,
+        cwd=workspaces,
         capture_output=True,
         text=True,
     )
@@ -122,7 +122,7 @@ def branch_for_job(job_id, issue_number):
         return f"feature/issue-{issue_number}"
     return f"feature/job-{job_id[:8]}"
 
-def create_pull_request(workspace, branch, default_branch, issue_number, output_file):
+def create_pull_request(workspaces, branch, default_branch, issue_number, output_file):
     cmd = ["gh", "pr", "create", "--base", default_branch, "--head", branch]
     if issue_number:
         cmd += [
@@ -132,7 +132,7 @@ def create_pull_request(workspace, branch, default_branch, issue_number, output_
     else:
         cmd += ["--fill"]
 
-    result = cmd_run(cmd, workspace, output_file)
+    result = cmd_run(cmd, workspaces, output_file)
 
     if result.returncode != 0:
         return None
@@ -144,7 +144,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
     pr_number = None
 
     try:
-        workspace = str(WORKSPACE_ROOT)
+        workspaces = str(WORKSPACE_ROOT)
 
         output_dir = ARTIFACT_ROOT / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -156,7 +156,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
 
         ensure_gh_auth()
 
-        default_branch = get_default_branch(workspace)
+        default_branch = get_default_branch(workspaces)
         branch = branch_for_job(job_id, issue_number)
 
         opencode_model = PROVIDER + "/" + MODEL
@@ -166,7 +166,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
             ["git", "checkout", "-B", branch, f"origin/{default_branch}"],
             [
                 "opencode",
-                "--dir", workspace,
+                "--dir", workspaces,
                 "--model", opencode_model,
                 "run",
                 "--agent", "build",
@@ -177,28 +177,28 @@ def run_job(job_id, prompt, artifact_path, issue_number):
 
         with open(output_file_path, "w", encoding="utf-8") as output_file:
             for cmd in commands:
-                result = cmd_run(cmd, workspace, output_file)
+                result = cmd_run(cmd, workspaces, output_file)
                 if result.returncode != 0:
                     return None
 
             if subprocess.run(
                 ["git", "diff", "--cached", "--quiet"],
-                cwd=workspace,
+                cwd=workspaces,
             ).returncode == 0:
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
-            if cmd_run(["git", "commit"], workspace, output_file).returncode != 0:
+            if cmd_run(["git", "commit"], workspaces, output_file).returncode != 0:
                 return None
 
             if cmd_run(
                 ["git", "push", "--set-upstream", "origin", branch],
-                workspace,
+                workspaces,
                 output_file,
             ).returncode != 0:
                 return None
 
-            pr_number = create_pull_request(workspace, branch, default_branch, issue_number, output_file)
+            pr_number = create_pull_request(workspaces, branch, default_branch, issue_number, output_file)
     except Exception as e:
         print("Error running job! " + str(e))
         return None

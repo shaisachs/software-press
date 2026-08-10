@@ -85,14 +85,14 @@ services:
       - ./artifacts:/artifacts
       - ./logs:/app/logs
       - ./datasets:/app/datasets
-      - ./workspaces:/workspace
+      - ./workspaces:/workspaces
     environment:
       DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
       REDIS_URL: redis://redis:6379
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OPENCODE_PROVIDER: deepseek
       OPENCODE_MODEL: deepseek-v4-flash
-      WORKSPACE_ROOT: /workspace
+      WORKSPACE_ROOT: /workspaces
       ARTIFACT_ROOT: /artifacts
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       GH_TOKEN: ${GH_TOKEN}

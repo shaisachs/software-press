@@ -87,7 +87,7 @@ curl http://ollama:11434/api/generate -d '{
 Test opencode from within the sp-agent-runner container:
 
 ```
-opencode --dir /workspace --model sp-ollama/qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."
+opencode --dir /workspaces --model sp-ollama/qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."
 ```
 
-The poem should appear in `./workspace/penguins.txt`.
+The poem should appear in `./workspaces/penguins.txt`.
