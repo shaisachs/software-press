@@ -23,10 +23,10 @@ def ensure_gh_auth():
         text=True,
     )
 
-def fetch_issue_text(issue_number: int) -> str:
+def fetch_issue_text(issue_number: int, working_dir: str) -> str:
     result = subprocess.run(
         ["gh", "issue", "view", str(issue_number), "--comments"],
-        cwd=WORKSPACE_ROOT,
+        cwd=working_dir,
         capture_output=True,
         text=True,
     )

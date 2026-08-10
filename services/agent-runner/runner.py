@@ -12,7 +12,7 @@ from gh import ensure_gh_auth, fetch_issue_text
 
 PROVIDER = os.getenv("OPENCODE_PROVIDER", "deepseek")
 MODEL = os.getenv("OPENCODE_MODEL", "deepseek-v4-flash")
-WORKSPACE_ROOT = Path("/workspaces")
+WORKSPACES_ROOT = Path("/workspaces")
 ARTIFACT_ROOT = Path("/artifacts")
 QUEUE_NAME = "jobs"
 
@@ -74,8 +74,9 @@ def dequeue_job():
         artifact_path = f"/artifacts/{job_id}.txt"
 
         if prompt is None and issue_number is not None:
+            workspaces = str(WORKSPACES_ROOT)
             ensure_gh_auth()
-            prompt = build_prompt(issue_number, fetch_issue_text(issue_number))
+            prompt = build_prompt(issue_number, fetch_issue_text(issue_number, workspaces))
             cur.execute(
                 "UPDATE jobs SET prompt = %s WHERE id = %s",
                 (prompt, job_id),
@@ -144,7 +145,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
     pr_number = None
 
     try:
-        workspaces = str(WORKSPACE_ROOT)
+        workspaces = str(WORKSPACES_ROOT)
 
         output_dir = ARTIFACT_ROOT / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
