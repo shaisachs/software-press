@@ -76,11 +76,8 @@ def dequeue_job():
         if prompt is None and issue_number is not None:
             workspaces = str(WORKSPACES_ROOT)
             ensure_gh_auth()
-            prompt = build_prompt(issue_number, fetch_issue_text(issue_number, workspaces))
-            cur.execute(
-                "UPDATE jobs SET prompt = %s WHERE id = %s",
-                (prompt, job_id),
-            )
+            issue_text = fetch_issue_text(issue_number, workspaces)
+            prompt = build_prompt(issue_number, issue_text)
             conn.commit()
     except Exception as e:
         complete_job(job_id, 'failed', str(e))
