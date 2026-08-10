@@ -8,7 +8,7 @@ import os
 import redis
 import psycopg2
 
-from gh import ensure_gh_auth
+from gh import ensure_gh_auth, fetch_issue_text
 
 PROVIDER = os.getenv("OPENCODE_PROVIDER", "deepseek")
 MODEL = os.getenv("OPENCODE_MODEL", "deepseek-v4-flash")
@@ -29,20 +29,6 @@ def get_conn():
         user=os.getenv("POSTGRES_USER", "sp_user"),
         password=os.getenv("POSTGRES_PASSWORD", "sp_password"),
     )
-
-def fetch_issue_text(issue_number: int) -> str:
-    result = subprocess.run(
-        ["gh", "issue", "view", str(issue_number), "--comments"],
-        cwd=WORKSPACE_ROOT,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "unknown gh error"
-        raise Exception(f"gh issue view failed: {detail}")
-
-    return result.stdout.strip()
 
 def build_prompt(issue_number: int, issue_text: str) -> str:
     return (

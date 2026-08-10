@@ -22,3 +22,17 @@ def ensure_gh_auth():
         capture_output=True,
         text=True,
     )
+
+def fetch_issue_text(issue_number: int) -> str:
+    result = subprocess.run(
+        ["gh", "issue", "view", str(issue_number), "--comments"],
+        cwd=WORKSPACE_ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown gh error"
+        raise Exception(f"gh issue view failed: {detail}")
+
+    return result.stdout.strip()
