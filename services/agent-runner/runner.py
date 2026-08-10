@@ -51,6 +51,7 @@ def dequeue_job():
     conn = get_conn()
     cur = conn.cursor()
 
+    effective_prompt = None
     try:
         cur.execute(
             """
@@ -77,13 +78,14 @@ def dequeue_job():
             workspaces = str(WORKSPACES_ROOT)
             ensure_gh_auth()
             issue_text = fetch_issue_text(issue_number, workspaces)
-            prompt = build_prompt(issue_number, issue_text)
-            conn.commit()
+            effective_prompt = build_prompt(issue_number, issue_text)
+        else:
+            effective_prompt = prompt
     except Exception as e:
         complete_job(job_id, 'failed', str(e))
         return (None, None, None, None)
 
-    return (job_id, prompt, artifact_path, issue_number)
+    return (job_id, effective_prompt, artifact_path, issue_number)
 
 def cmd_run(cmd, workspaces, output_file):
     result = subprocess.run(
