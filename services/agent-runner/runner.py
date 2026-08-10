@@ -101,7 +101,7 @@ def dequeue_job():
 
     return (job_id, prompt, artifact_path, issue_number)
 
-def git_run(cmd, workspace, output_file):
+def cmd_run(cmd, workspace, output_file):
     result = subprocess.run(
         cmd,
         cwd=workspace,
@@ -146,7 +146,7 @@ def create_pull_request(workspace, branch, default_branch, issue_number, output_
     else:
         cmd += ["--fill"]
 
-    result = git_run(cmd, workspace, output_file)
+    result = cmd_run(cmd, workspace, output_file)
 
     if result.returncode != 0:
         return None
@@ -191,7 +191,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
 
         with open(output_file_path, "w", encoding="utf-8") as output_file:
             for cmd in commands:
-                result = git_run(cmd, workspace, output_file)
+                result = cmd_run(cmd, workspace, output_file)
                 if result.returncode != 0:
                     return None
 
@@ -202,10 +202,10 @@ def run_job(job_id, prompt, artifact_path, issue_number):
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
-            if git_run(["git", "commit"], workspace, output_file).returncode != 0:
+            if cmd_run(["git", "commit"], workspace, output_file).returncode != 0:
                 return None
 
-            if git_run(
+            if cmd_run(
                 ["git", "push", "--set-upstream", "origin", branch],
                 workspace,
                 output_file,
