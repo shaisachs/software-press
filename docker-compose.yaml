@@ -81,8 +81,6 @@ services:
       ollama:
         condition: service_started
     restart: unless-stopped
-    ports:
-      - "8001:8000"
     volumes:
       - ./artifacts:/artifacts
       - ./logs:/app/logs
@@ -94,10 +92,6 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OPENCODE_PROVIDER: deepseek
       OPENCODE_MODEL: deepseek-v4-flash
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: artifacts
       WORKSPACE_ROOT: /workspace
       ARTIFACT_ROOT: /artifacts
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
@@ -117,4 +111,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:

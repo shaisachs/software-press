@@ -16,12 +16,13 @@ The first time you spin up the system, run:
 
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/002_add_github_columns.sql`
+`docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/003_allow_null_prompt.sql`
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
 ## Usage
 
-To enqueue a job:
+To enqueue a job, POST to `/jobs` with a `prompt`:
 
 ```
 curl -X POST http://localhost:8000/jobs \
@@ -30,6 +31,16 @@ curl -X POST http://localhost:8000/jobs \
         "prompt": "Write a hello world Python script and save it to helloworld.py"
     }'
 ```
+
+Alternatively, to turn a GitHub issue into a pull request, POST to `/jobs` with an `issueNumber`:
+
+```
+curl -X POST http://localhost:8000/jobs \
+    -H "Content-Type: application/json" \
+    -d '{"issueNumber": 42}'
+```
+
+Exactly one of `prompt` or `issueNumber` must be specified; providing neither or both returns a `400`. `issueNumber` must be a positive integer. The runner fetches the issue description and all comments, builds a prompt from it, and runs the job.
 
 Response:
 
@@ -40,20 +51,8 @@ Response:
 When the job completes, you should see:
 * Artifacts from the job in `artifacts/{job_id}` - e.g. `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/prompt.txt` and `artifacts/c733610a-9714-430e-8d07-3941afd8e29c/output.txt`.
 * Files written by the job in `workspaces/` - e.g. `workspaces/hello.py` in this case.
-* A new branch (`feature/job-<job-id>` for normal jobs) created, committed, and pushed with `git push --set-upstream origin <branch>`.
-* A pull request created via the `gh` cli for that branch; its number is stored in the `pr_number` column of the `jobs` table.
-
-### Issue-driven jobs
-
-To turn a GitHub issue into a pull request, POST to the agent-runner's `/issues` endpoint (host port 8001):
-
-```
-curl -X POST http://localhost:8001/issues \
-    -H "Content-Type: application/json" \
-    -d '{"issueNumber": 42}'
-```
-
-`issueNumber` must be a positive integer. The runner fetches the issue description and all comments from the repository in `workspaces/`, builds a prompt, and enqueues it as a normal job. The `issue_number` column of the `jobs` table records the source issue, and the resulting PR is opened against the repository's default branch with a title/body referencing the issue.
+* A new branch created, committed, and pushed with `git push --set-upstream origin <branch>` (`feature/job-<job-id>` for prompt jobs, `feature/issue-<issue-number>` for issue jobs).
+* A pull request created via the `gh` cli for that branch; its number is stored in the `pr_number` column of the `jobs` table. Issue jobs open the PR against the repository's default branch with a title/body referencing the issue, and the source issue is recorded in the `issue_number` column.
 
 ### GitHub credentials
 

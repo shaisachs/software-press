@@ -52,4 +52,4 @@ RUN mkdir -p ~/.local/share/opencode && \
     chmod +x ~/.git_templates/hooks/prepare-commit-msg && \
     git config --global core.hooksPath ~/.git_templates/hooks
 
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port 8000 & exec python3 runner.py"]
+CMD ["python3", "runner.py"]

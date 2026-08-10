@@ -1,8 +1,2 @@
-fastapi
-pydantic
 psycopg2-binary
 redis
-openai
-httpx
-minio
-uvicorn[standard]

@@ -30,20 +30,37 @@ def get_conn():
         password=os.getenv("POSTGRES_PASSWORD", "sp_password"),
     )
 
-def dequeue_job():
-    prompt = None
-    artifact_path = None
-    issue_number = None
+def fetch_issue_text(issue_number: int) -> str:
+    result = subprocess.run(
+        ["gh", "issue", "view", str(issue_number), "--comments"],
+        cwd=WORKSPACE_ROOT,
+        capture_output=True,
+        text=True,
+    )
 
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown gh error"
+        raise Exception(f"gh issue view failed: {detail}")
+
+    return result.stdout.strip()
+
+def build_prompt(issue_number: int, issue_text: str) -> str:
+    return (
+        "A GitHub issue has been filed against this repository. "
+        "Please resolve it by making the necessary changes to the code. "
+        "The changes will be committed and a pull request will be created for them.\n\n"
+        f"# GitHub Issue #{issue_number}\n\n"
+        f"{issue_text}"
+    )
+
+def dequeue_job():
     try:
         _, job_id = r.blpop(QUEUE_NAME)
-    except redis.exceptions.TimeoutError:
-        return (None, prompt, artifact_path, issue_number)
     except redis.exceptions.RedisError:
-        return (None, prompt, artifact_path, issue_number)
+        return (None, None, None, None)
 
     if not job_id:
-        return (job_id, prompt, artifact_path, issue_number)
+        return (None, None, None, None)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -69,8 +86,18 @@ def dequeue_job():
         prompt = row[0]
         issue_number = row[1]
         artifact_path = f"/artifacts/{job_id}.txt"
+
+        if prompt is None and issue_number is not None:
+            ensure_gh_auth()
+            prompt = build_prompt(issue_number, fetch_issue_text(issue_number))
+            cur.execute(
+                "UPDATE jobs SET prompt = %s WHERE id = %s",
+                (prompt, job_id),
+            )
+            conn.commit()
     except Exception as e:
         complete_job(job_id, 'failed', str(e))
+        return (None, None, None, None)
 
     return (job_id, prompt, artifact_path, issue_number)
 

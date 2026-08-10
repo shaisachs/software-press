@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import os
 import redis
 from uuid import uuid4
@@ -9,6 +11,14 @@ from app.models import CreateJobRequest
 app = FastAPI()
 
 redis_client = redis.Redis.from_url(os.environ["REDIS_URL"])
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors()},
+    )
 
 @app.get("/")
 def root():
@@ -32,10 +42,10 @@ def create_job(req: CreateJobRequest):
 
     cur.execute(
         """
-        INSERT INTO jobs (id, prompt, status)
-        VALUES (%s, %s, 'queued')
+        INSERT INTO jobs (id, prompt, issue_number, status)
+        VALUES (%s, %s, %s, 'queued')
         """,
-        (job_id, req.prompt),
+        (job_id, req.prompt, req.issueNumber),
     )
 
     conn.commit()
