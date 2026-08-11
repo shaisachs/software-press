@@ -12,21 +12,6 @@ from app.models import Job
 from app.queue_redis import Queue
 
 
-def build_prompt(issue_number: int, issue_text: str) -> str:
-    return (
-        "A GitHub issue has been filed against this repository - the body and comments are below. "
-        "Please resolve it by making the necessary changes to the code. "
-        "The changes will be committed and a pull request will be created for them.\n\n"
-        f"# GitHub Issue #{issue_number}\n\n"
-        f"{issue_text}"
-    )
-
-
-def make_artifact_path(job_id: str) -> Path:
-    now_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    return config.ARTIFACT_ROOT / f"{now_stamp}-{job_id}"
-
-
 class Runner:
     def __init__(self, queue: Queue, db: Db, gh: Gh, git: Git, command_runner: CommandRunner):
         self.queue = queue
@@ -34,6 +19,21 @@ class Runner:
         self._gh = gh
         self._git = git
         self._command_runner = command_runner
+
+    @staticmethod
+    def _build_prompt(issue_number: int, issue_text: str) -> str:
+        return (
+            "A GitHub issue has been filed against this repository - the body and comments are below. "
+            "Please resolve it by making the necessary changes to the code. "
+            "The changes will be committed and a pull request will be created for them.\n\n"
+            f"# GitHub Issue #{issue_number}\n\n"
+            f"{issue_text}"
+        )
+
+    @staticmethod
+    def _make_artifact_path(job_id: str) -> Path:
+        now_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        return config.ARTIFACT_ROOT / f"{now_stamp}-{job_id}"
 
     @classmethod
     def build(cls):
@@ -58,9 +58,9 @@ class Runner:
         try:
             if job.prompt is None and job.issue_number is not None:
                 issue_text = self._gh.fetch_issue_text(job.issue_number)
-                job.prompt = build_prompt(job.issue_number, issue_text)
+                job.prompt = self._build_prompt(job.issue_number, issue_text)
 
-            job.artifact_path = make_artifact_path(job_id)
+            job.artifact_path = self._make_artifact_path(job_id)
             job.artifact_path.mkdir(parents=True, exist_ok=True)
 
             self._db.mark_running(job)

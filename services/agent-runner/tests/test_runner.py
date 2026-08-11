@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from app.models import Job
-from app.runner import Runner, build_prompt, make_artifact_path
+from app.runner import Runner
 
 
 class FakeQueue:
@@ -90,14 +90,16 @@ def make_runner(tmp_path, job=None, queue_job_id="abc-123"):
     return runner, db, gh, git, command_runner
 
 
-def test_build_prompt():
-    prompt = build_prompt(42, "the body")
+def test_build_prompt(tmp_path):
+    runner, db, gh, git, command_runner = make_runner(tmp_path)
+    prompt = runner._build_prompt(42, "the body")
     assert "# GitHub Issue #42" in prompt
     assert "the body" in prompt
 
 
-def test_make_artifact_path():
-    path = make_artifact_path("abc-123")
+def test_make_artifact_path(tmp_path):
+    runner, db, gh, git, command_runner = make_runner(tmp_path)
+    path = runner._make_artifact_path("abc-123")
     assert str(path).endswith("abc-123")
     assert "/" in str(path)
 
