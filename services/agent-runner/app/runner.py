@@ -21,6 +21,19 @@ class Runner:
         self._command_runner = command_runner
 
     @staticmethod
+    def _format_issue_text(issue: dict) -> str:
+        output = ""
+        output += f"Title: {issue['title']}\n"
+        output += f"Body: {issue['body']}\n"
+
+        if issue["comments"]:
+            output += "Comments\n"
+            for comment in issue["comments"]:
+                output += comment["body"]
+
+        return output
+
+    @staticmethod
     def _build_prompt(issue_number: int, issue_text: str) -> str:
         return (
             "A GitHub issue has been filed against this repository - the body and comments are below. "
@@ -57,8 +70,8 @@ class Runner:
 
         try:
             if job.prompt is None and job.issue_number is not None:
-                issue_text = self._gh.fetch_issue_text(job.issue_number)
-                job.prompt = self._build_prompt(job.issue_number, issue_text)
+                issue = self._gh.fetch_issue(job.issue_number)
+                job.prompt = self._build_prompt(job.issue_number, self._format_issue_text(issue))
 
             job.artifact_path = self._make_artifact_path(job_id)
             job.artifact_path.mkdir(parents=True, exist_ok=True)

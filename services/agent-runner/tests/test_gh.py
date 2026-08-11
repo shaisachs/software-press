@@ -38,7 +38,7 @@ def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypat
     assert login_call[0] == ["gh", "auth", "login", "--with-token"]
 
 
-def test_fetch_issue_text_formats_issue_and_comments(recording_runner, monkeypatch):
+def test_fetch_issue_returns_well_formed_json(recording_runner, monkeypatch):
     monkeypatch.setenv("GH_TOKEN", "secret")
     recording_runner.on("auth status", make_result(returncode=0))
     payload = {
@@ -50,24 +50,23 @@ def test_fetch_issue_text_formats_issue_and_comments(recording_runner, monkeypat
     recording_runner.on("issue view", make_result(stdout=json.dumps(payload)))
 
     gh = Gh(recording_runner)
-    text = gh.fetch_issue_text(42)
+    issue = gh.fetch_issue(42)
 
     assert ["gh", "auth", "status"] in [c for (c, _of, _in) in recording_runner.calls]
-    assert "Title: Refactor things" in text
-    assert "Body: Please refactor." in text
-    assert "Comments" in text
-    assert "First comment" in text
-    assert "Second comment" in text
+    assert issue == payload
+    assert ["gh", "issue", "view", "42", "--comments", "--json", "number,title,body,comments"] in [
+        c for (c, _of, _in) in recording_runner.calls
+    ]
 
 
-def test_fetch_issue_text_raises_on_error(recording_runner, monkeypatch):
+def test_fetch_issue_raises_on_error(recording_runner, monkeypatch):
     monkeypatch.setenv("GH_TOKEN", "secret")
     recording_runner.on("auth status", make_result(returncode=0))
     recording_runner.on("issue view", make_result(returncode=1, stderr="boom"))
 
     gh = Gh(recording_runner)
     try:
-        gh.fetch_issue_text(42)
+        gh.fetch_issue(42)
     except Exception as e:
         assert "gh issue view failed" in str(e)
     else:

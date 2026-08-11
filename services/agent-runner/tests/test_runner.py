@@ -51,14 +51,19 @@ class FakeGit:
 
 
 class FakeGh:
-    def __init__(self, pr_number=99, issue_text="the issue"):
+    def __init__(self, pr_number=99, issue=None):
         self.pr_number = pr_number
-        self.issue_text = issue_text
+        self.issue = issue if issue is not None else {
+            "number": 42,
+            "title": "Fix the bug",
+            "body": "the issue",
+            "comments": [],
+        }
         self.calls = []
 
-    def fetch_issue_text(self, issue_number):
-        self.calls.append(("fetch_issue_text", issue_number))
-        return self.issue_text
+    def fetch_issue(self, issue_number):
+        self.calls.append(("fetch_issue", issue_number))
+        return self.issue
 
     def create_pull_request(self, branch, default_branch, issue_number, output_file):
         self.calls.append(("create_pull_request", branch, default_branch, issue_number))
@@ -97,6 +102,24 @@ def test_build_prompt(tmp_path):
     assert "the body" in prompt
 
 
+def test_format_issue_text(tmp_path):
+    runner, db, gh, git, command_runner = make_runner(tmp_path)
+    issue = {
+        "number": 42,
+        "title": "Refactor things",
+        "body": "Please refactor.",
+        "comments": [{"body": "First comment"}, {"body": "Second comment"}],
+    }
+
+    text = runner._format_issue_text(issue)
+
+    assert "Title: Refactor things" in text
+    assert "Body: Please refactor." in text
+    assert "Comments" in text
+    assert "First comment" in text
+    assert "Second comment" in text
+
+
 def test_make_artifact_path(tmp_path):
     runner, db, gh, git, command_runner = make_runner(tmp_path)
     path = runner._make_artifact_path("abc-123")
@@ -130,18 +153,19 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path):
     result = runner.dequeue_job()
 
     assert result is job
-    assert gh.calls == [("fetch_issue_text", 42)]
+    assert gh.calls == [("fetch_issue", 42)]
     assert "# GitHub Issue #42" in job.prompt
+    assert "Title: Fix the bug" in job.prompt
+    assert "the issue" in job.prompt
     assert db.running == [job]
 
 
 def test_dequeue_job_marks_failed_on_error(tmp_path):
     job = Job(job_id="abc-123", prompt=None, issue_number=42)
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
-    gh.issue_text = None
 
     class Boom(FakeGh):
-        def fetch_issue_text(self, issue_number):
+        def fetch_issue(self, issue_number):
             raise Exception("gh is down")
 
     runner._gh = Boom()

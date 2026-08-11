@@ -24,7 +24,7 @@ class Gh:
             input=token,
         )
 
-    def fetch_issue_text(self, issue_number: int) -> str:
+    def fetch_issue(self, issue_number: int) -> dict:
         self._ensure_gh_auth()
 
         result = self.command_runner.run(
@@ -43,18 +43,7 @@ class Gh:
             detail = result.stderr.strip() or result.stdout.strip() or "unknown gh error"
             raise Exception(f"gh issue view failed: {detail}")
 
-        issue = json.loads(result.stdout)
-
-        output = ""
-        output += f"Title: {issue['title']}\n"
-        output += f"Body: {issue['body']}\n"
-
-        if issue["comments"]:
-            output += "Comments\n"
-            for comment in issue["comments"]:
-                output += comment["body"]
-
-        return output
+        return json.loads(result.stdout)
 
     def create_pull_request(
         self,
