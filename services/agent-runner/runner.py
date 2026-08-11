@@ -32,7 +32,7 @@ def get_conn():
 
 def build_prompt(issue_number: int, issue_text: str) -> str:
     return (
-        "A GitHub issue has been filed against this repository. "
+        "A GitHub issue has been filed against this repository - the body and comments are below. "
         "Please resolve it by making the necessary changes to the code. "
         "The changes will be committed and a pull request will be created for them.\n\n"
         f"# GitHub Issue #{issue_number}\n\n"
@@ -181,10 +181,11 @@ def run_job(job_id, prompt, artifact_path, issue_number):
                 if result.returncode != 0:
                     return None
 
-            if subprocess.run(
-                ["git", "diff", "--cached", "--quiet"],
+            has_changes = subprocess.run(
+                ["git", "diff", "--staged", "--quiet"],
                 cwd=workspaces,
-            ).returncode == 0:
+            )
+            if has_changes.returncode == 0:
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
