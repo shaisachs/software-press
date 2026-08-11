@@ -4,7 +4,7 @@ from app.config import POSTGRES_DB, POSTGRES_HOST, POSTGRES_PASSWORD, POSTGRES_U
 from app.models import Job
 
 
-def get_conn():
+def _get_conn():
     return psycopg2.connect(
         host=POSTGRES_HOST,
         dbname=POSTGRES_DB,
@@ -14,11 +14,17 @@ def get_conn():
 
 
 class Db:
-    def __init__(self):
+    def __init__(self, get_conn=_get_conn):
         self._get_conn = get_conn
+        self._conn = self._get_conn()
+
+    def _connection(self):
+        if self._conn.closed:
+            self._conn = self._get_conn()
+        return self._conn
 
     def fetch_job(self, job_id: str) -> Job:
-        conn = self._get_conn()
+        conn = self._connection()
         cur = conn.cursor()
         try:
             cur.execute(
@@ -31,11 +37,12 @@ class Db:
             return Job(job_id=job_id, prompt=row[0], issue_number=row[1])
         except Exception as e:
             print("Error fetching job! " + str(e))
+            conn.rollback()
         finally:
-            conn.close()
+            cur.close()
 
     def mark_running(self, job: Job):
-        conn = self._get_conn()
+        conn = self._connection()
         cur = conn.cursor()
         try:
             cur.execute(
@@ -51,11 +58,12 @@ class Db:
             conn.commit()
         except Exception as e:
             print("Error marking job as running! " + str(e))
+            conn.rollback()
         finally:
-            conn.close()
+            cur.close()
 
     def complete_job(self, job_id: str, status: str, error_desc: str, pr_number=None):
-        conn = self._get_conn()
+        conn = self._connection()
         cur = conn.cursor()
         try:
             cur.execute(
@@ -72,5 +80,6 @@ class Db:
             conn.commit()
         except Exception as e:
             print("Error completing job! " + str(e))
+            conn.rollback()
         finally:
-            conn.close()
+            cur.close()

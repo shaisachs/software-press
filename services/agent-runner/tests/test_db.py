@@ -7,6 +7,8 @@ class FakeCursor:
         self.execute_calls = []
         self.fetchone_result = None
         self.committed = False
+        self.rolled_back = False
+        self.closed = False
 
     def execute(self, sql, params=None):
         self.execute_calls.append((sql, params))
@@ -16,6 +18,12 @@ class FakeCursor:
 
     def commit(self):
         self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+    def close(self):
+        self.closed = True
 
 
 class FakeConn:
@@ -29,21 +37,23 @@ class FakeConn:
     def commit(self):
         self._cursor.committed = True
 
+    def rollback(self):
+        self._cursor.rolled_back = True
+
     def close(self):
         self.closed = True
 
 
-def make_db(monkeypatch, cursor=None):
+def make_db(cursor=None):
     cursor = cursor or FakeCursor()
     conn = FakeConn(cursor)
-    monkeypatch.setattr("app.db.get_conn", lambda: conn)
-    return Db(), cursor, conn
+    return Db(get_conn=lambda: conn), cursor, conn
 
 
-def test_fetch_job_builds_job(monkeypatch):
+def test_fetch_job_builds_job():
     cursor = FakeCursor()
     cursor.fetchone_result = ("hello", 42)
-    db, cursor, conn = make_db(monkeypatch, cursor)
+    db, cursor, conn = make_db(cursor)
 
     job = db.fetch_job("abc-123")
 
@@ -51,21 +61,22 @@ def test_fetch_job_builds_job(monkeypatch):
     assert job.job_id == "abc-123"
     assert job.prompt == "hello"
     assert job.issue_number == 42
-    assert conn.closed
+    assert not conn.closed
+    assert cursor.closed
     assert cursor.execute_calls[0][1] == ("abc-123",)
 
 
-def test_fetch_job_returns_none_when_missing(monkeypatch):
+def test_fetch_job_returns_none_when_missing():
     cursor = FakeCursor()
     cursor.fetchone_result = None
-    db, _cursor, conn = make_db(monkeypatch, cursor)
+    db, _cursor, conn = make_db(cursor)
 
     assert db.fetch_job("missing") is None
-    assert conn.closed
+    assert not conn.closed
 
 
-def test_mark_running_updates_job(monkeypatch):
-    db, cursor, conn = make_db(monkeypatch)
+def test_mark_running_updates_job():
+    db, cursor, conn = make_db()
     job = Job(job_id="abc-123", artifact_path="/artifacts/20260811-abc-123")
 
     db.mark_running(job)
@@ -74,11 +85,11 @@ def test_mark_running_updates_job(monkeypatch):
     assert "UPDATE jobs" in sql
     assert params == ("/artifacts/20260811-abc-123", "abc-123")
     assert cursor.committed
-    assert conn.closed
+    assert not conn.closed
 
 
-def test_complete_job_updates_status(monkeypatch):
-    db, cursor, conn = make_db(monkeypatch)
+def test_complete_job_updates_status():
+    db, cursor, conn = make_db()
 
     db.complete_job("abc-123", "completed", None, pr_number=99)
 
@@ -86,17 +97,52 @@ def test_complete_job_updates_status(monkeypatch):
     assert "UPDATE jobs" in sql
     assert params == ("completed", None, 99, "abc-123")
     assert cursor.committed
-    assert conn.closed
+    assert not conn.closed
 
 
-def test_complete_job_swallows_db_errors(monkeypatch):
+def test_complete_job_swallows_db_errors():
     cursor = FakeCursor()
 
     def boom(sql, params=None):
         raise Exception("db is down")
 
     cursor.execute = boom
-    db, _cursor, conn = make_db(monkeypatch, cursor)
+    db, _cursor, conn = make_db(cursor)
 
     db.complete_job("abc-123", "failed", "boom")
-    assert conn.closed
+    assert not conn.closed
+    assert cursor.rolled_back
+
+
+def test_reuses_single_connection():
+    conn = FakeConn(FakeCursor())
+    calls = []
+
+    def factory():
+        calls.append(1)
+        return conn
+
+    db = Db(get_conn=factory)
+
+    db.fetch_job("abc-123")
+    db.mark_running(Job(job_id="abc-123"))
+    db.complete_job("abc-123", "completed", None)
+
+    assert len(calls) == 1
+    assert not conn.closed
+
+
+def test_connection_is_recreated_when_closed():
+    conn = FakeConn(FakeCursor())
+    calls = []
+
+    def factory():
+        calls.append(1)
+        return conn
+
+    db = Db(get_conn=factory)
+    conn.closed = True
+
+    db.complete_job("abc-123", "completed", None)
+
+    assert len(calls) == 2
