@@ -70,7 +70,7 @@ class Runner:
 
         return job
 
-    def run_prompt(self, model: str, prompt: str, output_file):
+    def _run_prompt(self, model: str, prompt: str, output_file):
         self._command_runner.run(
             [
                 "opencode",
@@ -98,7 +98,7 @@ class Runner:
                 if job.issue_number is not None:
                     (default_branch, branch) = self._git.create_branch(job.issue_number, output_file)
 
-                self.run_prompt(opencode_model, job.prompt, output_file)
+                self._run_prompt(opencode_model, job.prompt, output_file)
 
                 if not self._git.try_stage_changes(output_file):
                     output_file.write("No changes staged; skipping commit and pull request.\n")
