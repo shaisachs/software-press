@@ -10,7 +10,7 @@ class Gh:
     def __init__(self, command_runner: CommandRunner):
         self.command_runner = command_runner
 
-    def ensure_gh_auth(self):
+    def _ensure_gh_auth(self):
         token = os.getenv("GH_TOKEN")
         if not token:
             return
@@ -25,6 +25,8 @@ class Gh:
         )
 
     def fetch_issue_text(self, issue_number: int) -> str:
+        self._ensure_gh_auth()
+
         result = self.command_runner.run(
             [
                 "gh",
@@ -61,6 +63,8 @@ class Gh:
         issue_number: Optional[int],
         output_file: TextIO,
     ) -> Optional[int]:
+        self._ensure_gh_auth()
+
         cmd = ["gh", "pr", "create", "--base", default_branch, "--head", branch]
         if issue_number:
             cmd += [

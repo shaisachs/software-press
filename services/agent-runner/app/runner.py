@@ -57,7 +57,6 @@ class Runner:
 
         try:
             if job.prompt is None and job.issue_number is not None:
-                self._gh.ensure_gh_auth()
                 issue_text = self._gh.fetch_issue_text(job.issue_number)
                 job.prompt = build_prompt(job.issue_number, issue_text)
 
@@ -91,8 +90,6 @@ class Runner:
             artifact_path = job.artifact_path
             prompt_file = artifact_path / "prompt.txt"
             prompt_file.write_text(job.prompt)
-
-            self._gh.ensure_gh_auth()
 
             opencode_model = config.opencode_model()
 

@@ -56,9 +56,6 @@ class FakeGh:
         self.issue_text = issue_text
         self.calls = []
 
-    def ensure_gh_auth(self):
-        self.calls.append(("ensure_gh_auth",))
-
     def fetch_issue_text(self, issue_number):
         self.calls.append(("fetch_issue_text", issue_number))
         return self.issue_text
@@ -131,7 +128,7 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path):
     result = runner.dequeue_job()
 
     assert result is job
-    assert gh.calls == [("ensure_gh_auth",), ("fetch_issue_text", 42)]
+    assert gh.calls == [("fetch_issue_text", 42)]
     assert "# GitHub Issue #42" in job.prompt
     assert db.running == [job]
 
@@ -175,7 +172,6 @@ def test_run_job_with_issue_number(tmp_path):
     assert pr_number == 99
     assert (artifact_path / "prompt.txt").read_text() == "fix it"
     assert (artifact_path / "output.txt").exists()
-    assert gh.calls[0] == ("ensure_gh_auth",)
     assert ("create_branch", 42) in git.calls
     assert ("push_to_origin", "feature/issue-42") in git.calls
     assert ("create_pull_request", "feature/issue-42", "main", 42) in gh.calls
