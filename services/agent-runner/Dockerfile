@@ -29,6 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 COPY . .
 
+RUN pip install --no-cache-dir pytest && python3 -m pytest tests
+
 ARG GIT_NAME
 ARG GIT_EMAIL
 
@@ -52,4 +54,4 @@ RUN mkdir -p ~/.local/share/opencode && \
     chmod +x ~/.git_templates/hooks/prepare-commit-msg && \
     git config --global core.hooksPath ~/.git_templates/hooks
 
-CMD ["python3", "runner.py"]
+CMD ["python3", "-m", "app.runner"]
