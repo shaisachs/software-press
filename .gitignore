@@ -3,6 +3,6 @@ artifacts/
 logs/
 .DS_Store
 workspaces/
-.env
+.env.prod
 services/agent-runner/id_rsa
 __pycache__

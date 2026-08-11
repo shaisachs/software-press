@@ -4,13 +4,14 @@ Containerized agentic system for writing and reviewing software.
 
 ## Setup:
 
-* Provide your Docker API key, and your name/email for git commits, in `.env`.
+* Copy `.env` to `.env.prod`.
+* Provide your Docker API key, Git name/email, and Github access token, in `.env`.
 * Copy the SSH private key you use to access your git remote server into `services/agent-runner/id_rsa`.
 * Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces`
 
 To start:
 
-`docker compose up`
+`docker compose up --env-file .env.prod`
 
 The first time you spin up the system, run:
 
