@@ -124,6 +124,7 @@ def create_branch(workspaces, issue_number, output_file):
     default_branch = get_default_branch(workspaces)
     branch = branch_for_job(issue_number)
     cmd_run(["git", "checkout", "-B", branch, f"origin/{default_branch}"], workspaces, output_file)
+    return (default_branch, branch)
 
 def run_prompt(workspaces, model, prompt, output_file):
     cmd_run(
@@ -142,9 +143,9 @@ def try_stage_changes(workspaces: str, output_file) -> bool:
     cmd_run(["git", "add", "-A"], workspaces, output_file)
 
     has_changes = cmd_run(["git", "diff", "--staged", "--quiet"], workspaces, output_file)
-    return has_changes.returncode == 0
+    return has_changes.returncode != 0
 
-def commit_changes(workspace, output_file):
+def commit_changes(workspaces, output_file):
     cmd_run(["git", "commit"], workspaces, output_file)
 
 def push_to_origin(workspaces, branch, output_file):
@@ -192,16 +193,16 @@ def run_job(job_id, prompt, artifact_path, issue_number):
 
         with open(output_file_path, "w", encoding="utf-8") as output_file:
             if issue_number is not None:
-                create_branch(workspaces, issue_number, output_file)
+                (default_branch, branch) = create_branch(workspaces, issue_number, output_file)
 
-            run_prompt(workspaces, model, prompt, output_file)
+            run_prompt(workspaces, opencode_model, prompt, output_file)
 
-            if !try_stage_changes(workspaces, output_file):
+            if not try_stage_changes(workspaces, output_file):
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
             commit_changes(workspaces, output_file)
-            
+
             if issue_number is not None:
                 push_to_origin(workspaces, branch, output_file)
                 pr_number = create_pull_request(workspaces, branch, default_branch, issue_number, output_file)
