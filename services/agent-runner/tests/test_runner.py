@@ -145,7 +145,7 @@ def test_dequeue_job_marks_failed_on_error(tmp_path):
         def fetch_issue_text(self, issue_number):
             raise Exception("gh is down")
 
-    runner.gh = Boom()
+    runner._gh = Boom()
 
     assert runner.dequeue_job() is None
     assert db.completed == [("abc-123", "failed", "gh is down", None)]

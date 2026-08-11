@@ -31,9 +31,9 @@ class Runner:
     def __init__(self, queue: Queue, db: Db, gh: Gh, git: Git, command_runner: CommandRunner):
         self.queue = queue
         self._db = db
-        self.gh = gh
-        self.git = git
-        self.command_runner = command_runner
+        self._gh = gh
+        self._git = git
+        self._command_runner = command_runner
 
     @classmethod
     def build(cls):
@@ -57,8 +57,8 @@ class Runner:
 
         try:
             if job.prompt is None and job.issue_number is not None:
-                self.gh.ensure_gh_auth()
-                issue_text = self.gh.fetch_issue_text(job.issue_number)
+                self._gh.ensure_gh_auth()
+                issue_text = self._gh.fetch_issue_text(job.issue_number)
                 job.prompt = build_prompt(job.issue_number, issue_text)
 
             job.artifact_path = make_artifact_path(job_id)
@@ -72,10 +72,10 @@ class Runner:
         return job
 
     def run_prompt(self, model: str, prompt: str, output_file):
-        self.command_runner.run(
+        self._command_runner.run(
             [
                 "opencode",
-                "--dir", self.command_runner.working_dir,
+                "--dir", self._command_runner.working_dir,
                 "--model", model,
                 "run",
                 "--agent", "build",
@@ -92,26 +92,26 @@ class Runner:
             prompt_file = artifact_path / "prompt.txt"
             prompt_file.write_text(job.prompt)
 
-            self.gh.ensure_gh_auth()
+            self._gh.ensure_gh_auth()
 
             opencode_model = config.opencode_model()
 
             output_file_path = artifact_path / "output.txt"
             with open(output_file_path, "w", encoding="utf-8") as output_file:
                 if job.issue_number is not None:
-                    (default_branch, branch) = self.git.create_branch(job.issue_number, output_file)
+                    (default_branch, branch) = self._git.create_branch(job.issue_number, output_file)
 
                 self.run_prompt(opencode_model, job.prompt, output_file)
 
-                if not self.git.try_stage_changes(output_file):
+                if not self._git.try_stage_changes(output_file):
                     output_file.write("No changes staged; skipping commit and pull request.\n")
                     return None
 
-                self.git.commit_changes(output_file)
+                self._git.commit_changes(output_file)
 
                 if job.issue_number is not None:
-                    self.git.push_to_origin(branch, output_file)
-                    pr_number = self.gh.create_pull_request(branch, default_branch, job.issue_number, output_file)
+                    self._git.push_to_origin(branch, output_file)
+                    pr_number = self._gh.create_pull_request(branch, default_branch, job.issue_number, output_file)
         except Exception as e:
             print("Error running job! " + str(e))
             return None
