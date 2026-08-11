@@ -29,6 +29,8 @@ class Db:
             if row is None:
                 return None
             return Job(job_id=job_id, prompt=row[0], issue_number=row[1])
+        except Exception as e:
+            print("Error fetching job! " + str(e))
         finally:
             conn.close()
 
@@ -47,6 +49,8 @@ class Db:
                 (str(job.artifact_path), job.job_id),
             )
             conn.commit()
+        except Exception as e:
+            print("Error marking job as running! " + str(e))
         finally:
             conn.close()
 
