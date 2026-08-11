@@ -7,6 +7,7 @@ import time
 import os
 import redis
 import psycopg2
+from datetime import datetime
 
 from gh import ensure_gh_auth, fetch_issue_text
 
@@ -70,7 +71,11 @@ def dequeue_job():
         else:
             effective_prompt = prompt
 
-        artifact_path = ARTIFACT_ROOT / job_id
+
+        now_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        job_subdir = f"{now_stamp}-{job_id}"
+
+        artifact_path = ARTIFACT_ROOT / job_subdir
         artifact_path.mkdir(parents=True, exist_ok=True)
 
         cur.execute(
