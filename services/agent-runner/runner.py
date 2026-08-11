@@ -54,17 +54,6 @@ def dequeue_job():
     effective_prompt = None
     try:
         cur.execute(
-            """
-            UPDATE jobs
-            SET status = 'running',
-                started_at = NOW()
-            WHERE id = %s
-            """,
-            (job_id,),
-        )
-        conn.commit()
-
-        cur.execute(
             "SELECT prompt, issue_number FROM jobs WHERE id = %s",
             (job_id,),
         )
@@ -72,7 +61,6 @@ def dequeue_job():
         row = cur.fetchone()
         prompt = row[0]
         issue_number = row[1]
-        artifact_path = f"/artifacts/{job_id}.txt"
 
         if prompt is None and issue_number is not None:
             workspaces = str(WORKSPACES_ROOT)
@@ -81,6 +69,21 @@ def dequeue_job():
             effective_prompt = build_prompt(issue_number, issue_text)
         else:
             effective_prompt = prompt
+
+        artifact_path = ARTIFACT_ROOT / job_id
+        artifact_path.mkdir(parents=True, exist_ok=True)
+
+        cur.execute(
+            """
+            UPDATE jobs
+            SET status = 'running',
+                started_at = NOW(),
+                artifact_path = %s
+            WHERE id = %s
+            """,
+            (str(artifact_path), job_id),
+        )
+        conn.commit()        
     except Exception as e:
         complete_job(job_id, 'failed', str(e))
         return (None, None, None, None)
@@ -173,24 +176,20 @@ def create_pull_request(workspaces, branch, default_branch, issue_number, output
     match = re.search(r"pull/(\d+)", result.stdout)
     return int(match.group(1)) if match else None
 
-def run_job(job_id, prompt, artifact_path, issue_number):
+def run_job(prompt, artifact_path, issue_number):
     pr_number = None
 
     try:
         workspaces = str(WORKSPACES_ROOT)
 
-        output_dir = ARTIFACT_ROOT / job_id
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        prompt_file = output_dir / "prompt.txt"
-        output_file_path = output_dir / "output.txt"
-
+        prompt_file = artifact_path / "prompt.txt"
         prompt_file.write_text(prompt)
 
         ensure_gh_auth()
 
         opencode_model = PROVIDER + "/" + MODEL
 
+        output_file_path = artifact_path / "output.txt"
         with open(output_file_path, "w", encoding="utf-8") as output_file:
             if issue_number is not None:
                 (default_branch, branch) = create_branch(workspaces, issue_number, output_file)
@@ -238,7 +237,7 @@ while True:
     job_id, prompt, artifact_path, issue_number = dequeue_job()
 
     if job_id:
-        pr_number = run_job(job_id, prompt, artifact_path, issue_number)
+        pr_number = run_job(prompt, artifact_path, issue_number)
         complete_job(job_id, 'completed', None, pr_number)
 
     time.sleep(2)
