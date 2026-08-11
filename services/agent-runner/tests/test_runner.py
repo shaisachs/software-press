@@ -151,6 +151,14 @@ def test_dequeue_job_marks_failed_on_error(tmp_path):
     assert db.completed == [("abc-123", "failed", "gh is down", None)]
 
 
+def test_complete_job_delegates_to_db(tmp_path):
+    runner, db, gh, git, command_runner = make_runner(tmp_path)
+
+    runner.complete_job("abc-123", "completed", None, pr_number=99)
+
+    assert db.completed == [("abc-123", "completed", None, 99)]
+
+
 def test_run_job_with_issue_number(tmp_path):
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()

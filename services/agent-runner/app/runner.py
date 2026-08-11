@@ -30,7 +30,7 @@ def make_artifact_path(job_id: str) -> Path:
 class Runner:
     def __init__(self, queue: Queue, db: Db, gh: Gh, git: Git, command_runner: CommandRunner):
         self.queue = queue
-        self.db = db
+        self._db = db
         self.gh = gh
         self.git = git
         self.command_runner = command_runner
@@ -51,7 +51,7 @@ class Runner:
         if not job_id:
             return None
 
-        job = self.db.fetch_job(job_id)
+        job = self._db.fetch_job(job_id)
         if job is None:
             return None
 
@@ -64,9 +64,9 @@ class Runner:
             job.artifact_path = make_artifact_path(job_id)
             job.artifact_path.mkdir(parents=True, exist_ok=True)
 
-            self.db.mark_running(job)
+            self._db.mark_running(job)
         except Exception as e:
-            self.db.complete_job(job_id, 'failed', str(e))
+            self.complete_job(job_id, 'failed', str(e))
             return None
 
         return job
@@ -118,6 +118,9 @@ class Runner:
 
         return pr_number
 
+    def complete_job(self, job_id: str, status: str, error_desc: str, pr_number=None):
+        self._db.complete_job(job_id, status, error_desc, pr_number)
+
 
 def main():
     runner = Runner.build()
@@ -127,7 +130,7 @@ def main():
 
         if job:
             pr_number = runner.run_job(job)
-            runner.db.complete_job(job.job_id, 'completed', None, pr_number)
+            runner.complete_job(job.job_id, 'completed', None, pr_number)
 
         time.sleep(2)
 
