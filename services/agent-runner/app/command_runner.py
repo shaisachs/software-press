@@ -3,13 +3,13 @@ from typing import List, Optional, TextIO
 
 
 class CommandRunner:
-    def __init__(self, working_dir: str):
+    def __init__(self, working_dir: str, output_file: Optional[TextIO] = None):
         self.working_dir = working_dir
+        self.output_file = output_file
 
     def run(
         self,
         cmd: List[str],
-        output_file: Optional[TextIO] = None,
         input: Optional[str] = None,
     ):
         result = subprocess.run(
@@ -19,9 +19,9 @@ class CommandRunner:
             text=True,
             input=input,
         )
-        if output_file is not None:
-            output_file.write("$ " + " ".join(cmd) + "\n")
-            output_file.write(result.stdout)
-            output_file.write(result.stderr)
-            output_file.write("\n\n")
+        if self.output_file is not None:
+            self.output_file.write("$ " + " ".join(cmd) + "\n")
+            self.output_file.write(result.stdout)
+            self.output_file.write(result.stderr)
+            self.output_file.write("\n\n")
         return result

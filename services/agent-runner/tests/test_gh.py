@@ -1,5 +1,4 @@
 import json
-from unittest import mock
 
 from app.gh import Gh
 
@@ -22,8 +21,8 @@ def test_ensure_gh_auth_skips_when_already_authenticated(recording_runner, monke
     gh = Gh(recording_runner)
     gh._ensure_gh_auth()
 
-    assert ["gh", "auth", "status"] in [c for (c, _of, _in) in recording_runner.calls]
-    assert not [c for (c, _of, _in) in recording_runner.calls if "login" in c]
+    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
+    assert not [c for (c, _in) in recording_runner.calls if "login" in c]
 
 
 def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypatch):
@@ -33,7 +32,7 @@ def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypat
     gh = Gh(recording_runner)
     gh._ensure_gh_auth()
 
-    login_call = [c for (c, _of, _in) in recording_runner.calls if "login" in c]
+    login_call = [c for (c, _in) in recording_runner.calls if "login" in c]
     assert len(login_call) == 1
     assert login_call[0] == ["gh", "auth", "login", "--with-token"]
 
@@ -52,10 +51,10 @@ def test_fetch_issue_returns_well_formed_json(recording_runner, monkeypatch):
     gh = Gh(recording_runner)
     issue = gh.fetch_issue(42)
 
-    assert ["gh", "auth", "status"] in [c for (c, _of, _in) in recording_runner.calls]
+    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
     assert issue == payload
     assert ["gh", "issue", "view", "42", "--comments", "--json", "number,title,body,comments"] in [
-        c for (c, _of, _in) in recording_runner.calls
+        c for (c, _in) in recording_runner.calls
     ]
 
 
@@ -83,10 +82,10 @@ def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch):
 
     gh = Gh(recording_runner)
     pr_number = gh.create_pull_request(
-        "feature/issue-42", "main", 42, mock.Mock()
+        "feature/issue-42", "main", 42
     )
 
-    assert ["gh", "auth", "status"] in [c for (c, _of, _in) in recording_runner.calls]
+    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
     assert pr_number == 123
 
 
@@ -99,9 +98,9 @@ def test_create_pull_request_uses_fill_without_issue(recording_runner, monkeypat
     )
 
     gh = Gh(recording_runner)
-    gh.create_pull_request("feature/foo", "main", None, mock.Mock())
+    gh.create_pull_request("feature/foo", "main", None)
 
-    fill_call = [c for (c, _of, _in) in recording_runner.calls if "--fill" in c]
+    fill_call = [c for (c, _in) in recording_runner.calls if "--fill" in c]
     assert len(fill_call) == 1
 
 
@@ -112,7 +111,7 @@ def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch
 
     gh = Gh(recording_runner)
     pr_number = gh.create_pull_request(
-        "feature/issue-42", "main", 42, mock.Mock()
+        "feature/issue-42", "main", 42
     )
 
     assert pr_number is None

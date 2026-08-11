@@ -11,8 +11,8 @@ def test_run_uses_working_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("app.command_runner.subprocess.run", fake_run)
 
     output_file = mock.Mock()
-    runner = CommandRunner(str(tmp_path))
-    returned = runner.run(["git", "status"], output_file)
+    runner = CommandRunner(str(tmp_path), output_file)
+    returned = runner.run(["git", "status"])
 
     fake_run.assert_called_once_with(
         ["git", "status"],

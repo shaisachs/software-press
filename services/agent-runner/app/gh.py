@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Optional, TextIO
+from typing import Optional
 
 from app.command_runner import CommandRunner
 
@@ -50,7 +50,6 @@ class Gh:
         branch: str,
         default_branch: str,
         issue_number: Optional[int],
-        output_file: TextIO,
     ) -> Optional[int]:
         self._ensure_gh_auth()
 
@@ -63,7 +62,7 @@ class Gh:
         else:
             cmd += ["--fill"]
 
-        result = self.command_runner.run(cmd, output_file)
+        result = self.command_runner.run(cmd)
 
         if result.returncode != 0:
             return None

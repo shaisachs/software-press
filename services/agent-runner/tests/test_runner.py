@@ -35,18 +35,18 @@ class FakeGit:
         self.calls = []
         self.has_changes = True
 
-    def create_branch(self, issue_number, output_file):
+    def create_branch(self, issue_number):
         self.calls.append(("create_branch", issue_number))
         return ("main", "feature/issue-42")
 
-    def try_stage_changes(self, output_file):
+    def try_stage_changes(self):
         self.calls.append(("try_stage_changes",))
         return self.has_changes
 
-    def commit_changes(self, output_file):
+    def commit_changes(self):
         self.calls.append(("commit_changes",))
 
-    def push_to_origin(self, branch, output_file):
+    def push_to_origin(self, branch):
         self.calls.append(("push_to_origin", branch))
 
 
@@ -65,7 +65,7 @@ class FakeGh:
         self.calls.append(("fetch_issue", issue_number))
         return self.issue
 
-    def create_pull_request(self, branch, default_branch, issue_number, output_file):
+    def create_pull_request(self, branch, default_branch, issue_number):
         self.calls.append(("create_pull_request", branch, default_branch, issue_number))
         return self.pr_number
 
@@ -73,10 +73,11 @@ class FakeGh:
 class FakeCommandRunner:
     def __init__(self, working_dir="/workspaces"):
         self.working_dir = working_dir
+        self.output_file = None
         self.calls = []
 
-    def run(self, cmd, output_file=None, input=None):
-        self.calls.append((list(cmd), output_file))
+    def run(self, cmd, input=None):
+        self.calls.append((list(cmd), input))
 
 
 def make_runner(tmp_path, job=None, queue_job_id="abc-123"):

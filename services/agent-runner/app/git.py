@@ -1,4 +1,4 @@
-from typing import Optional, TextIO, Tuple
+from typing import Tuple
 
 from app.command_runner import CommandRunner
 
@@ -20,27 +20,23 @@ class Git:
     def branch_for_job(issue_number: int) -> str:
         return f"feature/issue-{issue_number}"
 
-    def create_branch(self, issue_number: int, output_file: TextIO) -> Tuple[str, str]:
+    def create_branch(self, issue_number: int) -> Tuple[str, str]:
         default_branch = self.get_default_branch()
         branch = self.branch_for_job(issue_number)
         self.command_runner.run(
-            ["git", "checkout", "-B", branch, f"origin/{default_branch}"],
-            output_file,
+            ["git", "checkout", "-B", branch, f"origin/{default_branch}"]
         )
         return (default_branch, branch)
 
-    def try_stage_changes(self, output_file: TextIO) -> bool:
-        self.command_runner.run(["git", "add", "-A"], output_file)
-        has_changes = self.command_runner.run(
-            ["git", "diff", "--staged", "--quiet"], output_file
-        )
+    def try_stage_changes(self) -> bool:
+        self.command_runner.run(["git", "add", "-A"])
+        has_changes = self.command_runner.run(["git", "diff", "--staged", "--quiet"])
         return has_changes.returncode != 0
 
-    def commit_changes(self, output_file: TextIO):
-        self.command_runner.run(["git", "commit"], output_file)
+    def commit_changes(self):
+        self.command_runner.run(["git", "commit"])
 
-    def push_to_origin(self, branch: str, output_file: TextIO):
+    def push_to_origin(self, branch: str):
         self.command_runner.run(
-            ["git", "push", "--set-upstream", "origin", branch],
-            output_file,
+            ["git", "push", "--set-upstream", "origin", branch]
         )

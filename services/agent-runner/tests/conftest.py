@@ -20,8 +20,8 @@ def make_result(returncode=0, stdout="", stderr=""):
 
 
 class RecordingCommandRunner(CommandRunner):
-    def __init__(self, working_dir="/workspaces"):
-        super().__init__(working_dir)
+    def __init__(self, working_dir="/workspaces", output_file=None):
+        super().__init__(working_dir, output_file)
         self.calls = []
         self._handlers = []
 
@@ -29,8 +29,8 @@ class RecordingCommandRunner(CommandRunner):
         self._handlers.append((match, result))
         return self
 
-    def run(self, cmd, output_file=None, input=None):
-        self.calls.append((list(cmd), output_file, input))
+    def run(self, cmd, input=None):
+        self.calls.append((list(cmd), input))
         joined = " ".join(cmd)
         for match, result in self._handlers:
             if match in joined:

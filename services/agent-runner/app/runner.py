@@ -83,7 +83,7 @@ class Runner:
 
         return job
 
-    def _run_prompt(self, model: str, prompt: str, output_file):
+    def _run_prompt(self, model: str, prompt: str):
         self._command_runner.run(
             [
                 "opencode",
@@ -92,8 +92,7 @@ class Runner:
                 "run",
                 "--agent", "build",
                 prompt,
-            ],
-            output_file,
+            ]
         )
 
     def run_job(self, job: Job) -> Optional[int]:
@@ -108,23 +107,27 @@ class Runner:
 
             output_file_path = artifact_path / "output.txt"
             with open(output_file_path, "w", encoding="utf-8") as output_file:
+                self._command_runner.output_file = output_file
+
                 if job.issue_number is not None:
-                    (default_branch, branch) = self._git.create_branch(job.issue_number, output_file)
+                    (default_branch, branch) = self._git.create_branch(job.issue_number)
 
-                self._run_prompt(opencode_model, job.prompt, output_file)
+                self._run_prompt(opencode_model, job.prompt)
 
-                if not self._git.try_stage_changes(output_file):
+                if not self._git.try_stage_changes():
                     output_file.write("No changes staged; skipping commit and pull request.\n")
                     return None
 
-                self._git.commit_changes(output_file)
+                self._git.commit_changes()
 
                 if job.issue_number is not None:
-                    self._git.push_to_origin(branch, output_file)
-                    pr_number = self._gh.create_pull_request(branch, default_branch, job.issue_number, output_file)
+                    self._git.push_to_origin(branch)
+                    pr_number = self._gh.create_pull_request(branch, default_branch, job.issue_number)
         except Exception as e:
             print("Error running job! " + str(e))
             return None
+        finally:
+            self._command_runner.output_file = None
 
         return pr_number
 
