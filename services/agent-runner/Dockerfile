@@ -9,11 +9,20 @@ RUN apt-get update && apt-get install -y \
     bash \
     python3 \
     python3-pip \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g opencode-ai
 
 WORKDIR /app
+
+ENV GH_PROTOCOL=ssh
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
@@ -36,6 +45,8 @@ RUN mkdir -p ~/.local/share/opencode && \
     ssh-keyscan -H github.com >> ~/.ssh/known_hosts && \
     git config --global user.name "$GIT_NAME" && \
     git config --global user.email "$GIT_EMAIL" && \
+    git config --global url."git@github.com:".insteadOf "https://github.com/" && \
+    git config --global core.sshCommand "ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes" && \
     mkdir -p ~/.git_templates/hooks && \
     mv prepare-commit-msg ~/.git_templates/hooks/ && \
     chmod +x ~/.git_templates/hooks/prepare-commit-msg && \

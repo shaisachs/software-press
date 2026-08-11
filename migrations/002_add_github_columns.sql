@@ -1,0 +1,2 @@
+ALTER TABLE jobs ADD COLUMN issue_number INTEGER;
+ALTER TABLE jobs ADD COLUMN pr_number INTEGER;
