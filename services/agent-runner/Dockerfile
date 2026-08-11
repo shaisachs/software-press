@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
 
 COPY . .
 
-RUN pip install --no-cache-dir pytest && python3 -m pytest tests
+RUN pip install --no-cache-dir pytest --break-system-packages && python3 -m pytest tests
 
 ARG GIT_NAME
 ARG GIT_EMAIL
