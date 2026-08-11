@@ -117,10 +117,42 @@ def get_default_branch(workspaces):
         return result.stdout.strip().split("/")[-1]
     return "main"
 
-def branch_for_job(job_id, issue_number):
-    if issue_number:
-        return f"feature/issue-{issue_number}"
-    return f"feature/job-{job_id[:8]}"
+def branch_for_job(issue_number):
+    return f"feature/issue-{issue_number}"
+    
+def create_branch(workspaces, issue_number, output_file):
+    default_branch = get_default_branch(workspaces)
+    branch = branch_for_job(issue_number)
+    cmd_run(["git", "checkout", "-B", branch, f"origin/{default_branch}"], workspaces, output_file)
+
+def run_prompt(workspaces, model, prompt, output_file):
+    cmd_run(
+        [
+            "opencode",
+            "--dir", workspaces,
+            "--model", model,
+            "run",
+            "--agent", "build",
+            prompt
+        ],
+        workspaces,
+        output_file)
+
+def try_stage_changes(workspaces: str, output_file) -> bool:
+    cmd_run(["git", "add", "-A"], workspaces, output_file)
+
+    has_changes = cmd_run(["git", "diff", "--staged", "--quiet"], workspaces, output_file)
+    return has_changes.returncode == 0
+
+def commit_changes(workspace, output_file):
+    cmd_run(["git", "commit"], workspaces, output_file)
+
+def push_to_origin(workspaces, branch, output_file):
+    cmd_run(
+        ["git", "push", "--set-upstream", "origin", branch],
+        workspaces,
+        output_file,
+    )
 
 def create_pull_request(workspaces, branch, default_branch, issue_number, output_file):
     cmd = ["gh", "pr", "create", "--base", default_branch, "--head", branch]
@@ -156,49 +188,23 @@ def run_job(job_id, prompt, artifact_path, issue_number):
 
         ensure_gh_auth()
 
-        default_branch = get_default_branch(workspaces)
-        branch = branch_for_job(job_id, issue_number)
-
         opencode_model = PROVIDER + "/" + MODEL
 
-        commands = [
-            ["git", "fetch", "origin"],
-            ["git", "checkout", "-B", branch, f"origin/{default_branch}"],
-            [
-                "opencode",
-                "--dir", workspaces,
-                "--model", opencode_model,
-                "run",
-                "--agent", "build",
-                prompt
-            ],
-            ["git", "add", "-A"],
-        ]
-
         with open(output_file_path, "w", encoding="utf-8") as output_file:
-            for cmd in commands:
-                result = cmd_run(cmd, workspaces, output_file)
-                if result.returncode != 0:
-                    return None
+            if issue_number is not None:
+                create_branch(workspaces, issue_number, output_file)
 
-            has_changes = subprocess.run(
-                ["git", "diff", "--staged", "--quiet"],
-                cwd=workspaces,
-            )
-            if has_changes.returncode == 0:
+            run_prompt(workspaces, model, prompt, output_file)
+
+            if !try_stage_changes(workspaces, output_file):
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
-            cmd_run(["git", "commit"], workspaces, output_file)
-
-            if cmd_run(
-                ["git", "push", "--set-upstream", "origin", branch],
-                workspaces,
-                output_file,
-            ).returncode != 0:
-                return None
-
-            pr_number = create_pull_request(workspaces, branch, default_branch, issue_number, output_file)
+            commit_changes(workspaces, output_file)
+            
+            if issue_number is not None:
+                push_to_origin(workspaces, branch, output_file)
+                pr_number = create_pull_request(workspaces, branch, default_branch, issue_number, output_file)
     except Exception as e:
         print("Error running job! " + str(e))
         return None
