@@ -189,8 +189,7 @@ def run_job(job_id, prompt, artifact_path, issue_number):
                 output_file.write("No changes staged; skipping commit and pull request.\n")
                 return None
 
-            if cmd_run(["git", "commit"], workspaces, output_file).returncode != 0:
-                return None
+            cmd_run(["git", "commit"], workspaces, output_file)
 
             if cmd_run(
                 ["git", "push", "--set-upstream", "origin", branch],
