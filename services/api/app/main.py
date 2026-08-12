@@ -15,9 +15,14 @@ redis_client = redis.Redis.from_url(os.environ["REDIS_URL"])
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    for err in errors:
+        ctx = err.get("ctx")
+        if ctx and "error" in ctx:
+            ctx["error"] = str(ctx["error"])
     return JSONResponse(
         status_code=400,
-        content={"detail": exc.errors()},
+        content={"detail": errors},
     )
 
 @app.get("/")
