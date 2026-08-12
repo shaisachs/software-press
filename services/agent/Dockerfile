@@ -18,23 +18,31 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd --create-home --shell /bin/bash agent
+
 RUN npm install -g opencode-ai
 
 WORKDIR /app
 
 ENV GH_PROTOCOL=ssh
+ENV HOME=/home/agent
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --break-system-packages
+RUN pip install --no-cache-dir -r requirements.txt pytest --break-system-packages
 
 COPY . .
 
-RUN pip install --no-cache-dir pytest --break-system-packages && python3 -m pytest tests
+RUN chown -R agent:agent /app
+
+RUN mkdir -p /workspaces /artifacts && chown agent:agent /workspaces /artifacts
+
+USER agent
+
+RUN python3 -m pytest tests
 
 ARG GIT_NAME
 ARG GIT_EMAIL
 
-# TODO: create a normal user so we're not doing everything as root
 # TODO: refactor into a bootstrap.sh; pull ssh-keyscan into an early layer so it's cached
 RUN mkdir -p ~/.local/share/opencode && \
     mv opencode-auth.json ~/.local/share/opencode/auth.json && \
