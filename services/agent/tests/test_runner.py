@@ -166,7 +166,6 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path):
     assert "# GitHub Issue #42" in job.prompt
     assert "Title: Fix the bug" in job.prompt
     assert "the issue" in job.prompt
-    assert job.issue_title == "Fix the bug"
     assert db.running == [job]
 
 
@@ -199,7 +198,6 @@ def test_run_job_with_issue_number(tmp_path):
         job_id="abc-123",
         prompt="fix it",
         issue_number=42,
-        issue_title="Fix the bug",
         artifact_path=artifact_path,
     )
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
@@ -212,6 +210,7 @@ def test_run_job_with_issue_number(tmp_path):
     assert ("create_branch", "feature/fix-the-bug") in git.calls
     assert ("push_to_origin", "feature/fix-the-bug") in git.calls
     assert ("create_pull_request", "feature/fix-the-bug", "main", 42) in gh.calls
+    assert ("fetch_issue", 42) in gh.calls
     assert any(c[0][0] == "opencode" for c in command_runner.calls)
 
 

@@ -8,7 +8,6 @@ class Job:
     job_id: str
     prompt: Optional[str] = None
     issue_number: Optional[int] = None
-    issue_title: Optional[str] = None
     artifact_path: Optional[Path] = None
     pr_number: Optional[int] = None
     status: Optional[str] = None

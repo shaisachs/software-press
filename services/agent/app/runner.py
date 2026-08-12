@@ -75,11 +75,9 @@ class Runner:
             return None
 
         try:
-            if job.issue_number is not None and (job.prompt is None or job.issue_title is None):
+            if job.issue_number is not None and job.prompt is None:
                 issue = self._gh.fetch_issue(job.issue_number)
-                job.issue_title = issue["title"]
-                if job.prompt is None:
-                    job.prompt = self._build_prompt(job.issue_number, self._format_issue_text(issue))
+                job.prompt = self._build_prompt(job.issue_number, self._format_issue_text(issue))
 
             job.artifact_path = self._make_artifact_path(job_id)
             job.artifact_path.mkdir(parents=True, exist_ok=True)
@@ -118,9 +116,8 @@ class Runner:
                 self._command_runner.output_file = output_file
 
                 if job.issue_number is not None:
-                    if job.issue_title is None:
-                        job.issue_title = self._gh.fetch_issue(job.issue_number)["title"]
-                    branch = self.branch_name_for_issue(job.issue_title)
+                    issue = self._gh.fetch_issue(job.issue_number)
+                    branch = self.branch_name_for_issue(issue["title"])
                     (default_branch, branch) = self._git.create_branch(branch)
 
                 self._run_prompt(opencode_model, job.prompt)
