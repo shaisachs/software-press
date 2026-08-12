@@ -16,13 +16,8 @@ class Git:
             return result.stdout.strip().split("/")[-1]
         return "main"
 
-    @staticmethod
-    def branch_for_job(issue_number: int) -> str:
-        return f"feature/issue-{issue_number}"
-
-    def create_branch(self, issue_number: int) -> Tuple[str, str]:
+    def create_branch(self, branch: str) -> Tuple[str, str]:
         default_branch = self.get_default_branch()
-        branch = self.branch_for_job(issue_number)
         self.command_runner.run(
             ["git", "checkout", "-B", branch, f"origin/{default_branch}"]
         )

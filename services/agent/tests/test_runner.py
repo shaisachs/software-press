@@ -35,9 +35,9 @@ class FakeGit:
         self.calls = []
         self.has_changes = True
 
-    def create_branch(self, issue_number):
-        self.calls.append(("create_branch", issue_number))
-        return ("main", "feature/issue-42")
+    def create_branch(self, branch):
+        self.calls.append(("create_branch", branch))
+        return ("main", branch)
 
     def try_stage_changes(self):
         self.calls.append(("try_stage_changes",))
@@ -121,6 +121,14 @@ def test_format_issue_text(tmp_path):
     assert "Second comment" in text
 
 
+def test_branch_name_for_issue(tmp_path):
+    runner, db, gh, git, command_runner = make_runner(tmp_path)
+
+    assert runner.branch_name_for_issue("Add the Bitter Lesson") == "feature/add-the-bitter-lesson"
+    assert runner.branch_name_for_issue("  Fix  This   Bug  ") == "feature/fix-this-bug"
+    assert runner.branch_name_for_issue("Needs: Proper Casing!") == "feature/needs-proper-casing"
+
+
 def test_make_artifact_path(tmp_path):
     runner, db, gh, git, command_runner = make_runner(tmp_path)
     path = runner._make_artifact_path("abc-123")
@@ -199,9 +207,10 @@ def test_run_job_with_issue_number(tmp_path):
     assert pr_number == 99
     assert (artifact_path / "prompt.txt").read_text() == "fix it"
     assert (artifact_path / "output.txt").exists()
-    assert ("create_branch", 42) in git.calls
-    assert ("push_to_origin", "feature/issue-42") in git.calls
-    assert ("create_pull_request", "feature/issue-42", "main", 42) in gh.calls
+    assert ("create_branch", "feature/fix-the-bug") in git.calls
+    assert ("push_to_origin", "feature/fix-the-bug") in git.calls
+    assert ("create_pull_request", "feature/fix-the-bug", "main", 42) in gh.calls
+    assert ("fetch_issue", 42) in gh.calls
     assert any(c[0][0] == "opencode" for c in command_runner.calls)
 
 

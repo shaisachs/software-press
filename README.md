@@ -6,7 +6,7 @@ Containerized agentic system for writing and reviewing software.
 
 * Copy `.env` to `.env.prod`.
 * Provide your Docker API key, Git name/email, and Github access token, in `.env`.
-* Copy the SSH private key you use to access your git remote server into `services/agent-runner/id_rsa`.
+* Copy the SSH private key you use to access your git remote server into `services/agent/id_rsa`.
 * Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces`
 
 To start:
@@ -76,7 +76,7 @@ The Deepseek models require API keys. Flash is recommended for lightweight tasks
 
 ## Debugging
 
-Test ollama connectivity from within the sp-agent-runner container:
+Test ollama connectivity from within the sp-agent container:
 
 ```
 curl http://ollama:11434/api/generate -d '{
@@ -86,7 +86,7 @@ curl http://ollama:11434/api/generate -d '{
 }'
 ```
 
-Test opencode from within the sp-agent-runner container:
+Test opencode from within the sp-agent container:
 
 ```
 opencode --dir /workspaces --model sp-ollama/qwen2.5:0.5b run "Write a poem about penguins to penguins.txt."

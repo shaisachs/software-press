@@ -1,3 +1,5 @@
-- [ ] allow the /jobs API to intake a provider and model so the defaults can be overridden
 - [x] mount deepseek api keys safely
+- [x] build pr name out of issue description
 - [ ] ollama model init should be optional
+- [ ] "error: Terminal is dumb, but EDITOR unset"
+- [x] agent Docker is kind of a mess

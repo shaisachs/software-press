@@ -4,6 +4,6 @@ logs/
 .DS_Store
 workspaces/
 .env.prod
-services/agent-runner/id_rsa
+services/agent/id_rsa
 __pycache__
 .pytest_cache/
