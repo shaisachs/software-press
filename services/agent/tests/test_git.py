@@ -27,10 +27,6 @@ def test_get_default_branch_falls_back_to_main(recording_runner):
     assert git.get_default_branch() == "main"
 
 
-def test_branch_for_job():
-    assert Git.branch_for_job(42) == "feature/issue-42"
-
-
 def test_create_branch(recording_runner):
     recording_runner.on(
         "symbolic-ref",
@@ -38,11 +34,11 @@ def test_create_branch(recording_runner):
     )
 
     git = make_git(recording_runner)
-    default_branch, branch = git.create_branch(42)
+    default_branch, branch = git.create_branch("feature/add-the-bitter-lesson")
 
     assert default_branch == "main"
-    assert branch == "feature/issue-42"
-    assert ["git", "checkout", "-B", "feature/issue-42", "origin/main"] in [
+    assert branch == "feature/add-the-bitter-lesson"
+    assert ["git", "checkout", "-B", "feature/add-the-bitter-lesson", "origin/main"] in [
         c for (c, _in) in recording_runner.calls
     ]
 
