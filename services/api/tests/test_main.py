@@ -1,5 +1,7 @@
 import uuid
 
+VALID_REPO = "shaisachs/laws-of-software"
+
 
 def test_root(client):
     resp = client.get("/")
@@ -25,7 +27,7 @@ def test_health_reflects_redis_ping_result(client, mocked_deps):
 
 
 def test_create_job_with_prompt(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "write hello world"})
+    resp = client.post("/jobs", json={"prompt": "write hello world", "repo": VALID_REPO})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -37,14 +39,14 @@ def test_create_job_with_prompt(client, mocked_deps):
     cursor = conn._cursor
     sql, params = cursor.execute_calls[0]
     assert "INSERT INTO jobs" in sql
-    assert "VALUES (%s, %s, %s, 'queued')" in sql
-    assert params == (job_id, "write hello world", None)
+    assert "VALUES (%s, %s, %s, %s, 'queued')" in sql
+    assert params == (job_id, "write hello world", None, VALID_REPO)
     assert conn.commits == 1
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
 
 def test_create_job_with_issue_number(client, mocked_deps):
-    resp = client.post("/jobs", json={"issueNumber": 42})
+    resp = client.post("/jobs", json={"issueNumber": 42, "repo": VALID_REPO})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -54,13 +56,29 @@ def test_create_job_with_issue_number(client, mocked_deps):
     conn = mocked_deps["conn"]
     sql, params = conn._cursor.execute_calls[0]
     assert "INSERT INTO jobs" in sql
-    assert params == (job_id, None, 42)
+    assert params == (job_id, None, 42, VALID_REPO)
     assert conn.commits == 1
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
 
+def test_create_job_rejects_missing_repo(client, mocked_deps):
+    resp = client.post("/jobs", json={"prompt": "write hello world"})
+
+    assert resp.status_code == 400
+    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["enqueue_job"].assert_not_called()
+
+
+def test_create_job_rejects_invalid_repo(client, mocked_deps):
+    resp = client.post("/jobs", json={"prompt": "write hello world", "repo": "not-a-repo"})
+
+    assert resp.status_code == 400
+    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["enqueue_job"].assert_not_called()
+
+
 def test_create_job_rejects_missing_prompt_and_issue(client, mocked_deps):
-    resp = client.post("/jobs", json={})
+    resp = client.post("/jobs", json={"repo": VALID_REPO})
 
     assert resp.status_code == 400
     assert mocked_deps["conn"]._cursor.execute_calls == []
@@ -68,7 +86,7 @@ def test_create_job_rejects_missing_prompt_and_issue(client, mocked_deps):
 
 
 def test_create_job_rejects_both_prompt_and_issue(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "hi", "issueNumber": 1})
+    resp = client.post("/jobs", json={"prompt": "hi", "issueNumber": 1, "repo": VALID_REPO})
 
     assert resp.status_code == 400
     assert "exactly one" in str(resp.json()["detail"])
@@ -76,7 +94,7 @@ def test_create_job_rejects_both_prompt_and_issue(client, mocked_deps):
 
 
 def test_create_job_rejects_non_positive_issue_number(client, mocked_deps):
-    resp = client.post("/jobs", json={"issueNumber": 0})
+    resp = client.post("/jobs", json={"issueNumber": 0, "repo": VALID_REPO})
 
     assert resp.status_code == 400
     mocked_deps["enqueue_job"].assert_not_called()
@@ -92,6 +110,7 @@ def test_get_job_returns_row(client, mocked_deps):
         None,
         None,
         42,
+        VALID_REPO,
     )
 
     resp = client.get("/jobs/abc-123")
@@ -105,6 +124,7 @@ def test_get_job_returns_row(client, mocked_deps):
         "error": None,
         "pr_number": None,
         "issue_number": 42,
+        "repo": VALID_REPO,
     }
     sql, params = conn._cursor.execute_calls[0]
     assert "SELECT" in sql

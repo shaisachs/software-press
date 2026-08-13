@@ -7,7 +7,7 @@ Containerized agentic system for writing and reviewing software.
 * Copy `.env` to `.env.prod`.
 * Provide your Docker API key, Git name/email, and Github access token, in `.env`.
 * Copy the SSH private key you use to access your git remote server into `services/agent/id_rsa`.
-* Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces`
+* Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces/example/foobar`
 
 To start:
 
@@ -18,6 +18,7 @@ The first time you spin up the system, run:
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/002_add_github_columns.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/003_allow_null_prompt.sql`
+`docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/004_add_repo_column.sql`
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
@@ -31,11 +32,12 @@ For an *ad hoc* prompt:
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
     -d '{
+        "repo": "example/foobar",
         "prompt": "Write a hello world Python script and save it to helloworld.py"
     }'
 ```
 
-The agent will write and commit code to `/workspaces`, in the current branch. It will not push.
+The agent will write and commit code to `workspaces/example/foobar`, in the current branch. It will not push.
 
 ### Github Issues
 
@@ -44,10 +46,10 @@ To turn a GitHub issue into a pull request:
 ```
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
-    -d '{"issueNumber": 42}'
+    -d '{"repo": "example/foobar", "issueNumber": 42}'
 ```
 
-The agent uses `gh` to fetch the specified issue, for the Github repository in `workspaces/`; it builds a prompt around the issue, and executes the prompt. The resulting code is saved to a new branch, which is pushed and turned into a new pull request.
+The agent uses `gh` to fetch the specified issue, for the Github repository at `workspaces/example/foobar`; it builds a prompt around the issue, and executes the prompt. The resulting code is saved to a new branch, which is pushed and turned into a new pull request.
 
 ### Output and debugging
 

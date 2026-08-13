@@ -65,6 +65,18 @@ class Runner:
             command_runner=command_runner,
         )
 
+    @staticmethod
+    def _workspace_dir(repo: str) -> Path:
+        return config.WORKSPACES_ROOT / repo
+
+    def _validate_repo(self, repo: str) -> Path:
+        if not repo:
+            raise Exception("repo is required")
+        workspace_dir = self._workspace_dir(repo)
+        if not workspace_dir.is_dir():
+            raise Exception(f"repo directory not found on disk: {workspace_dir}")
+        return workspace_dir
+
     def dequeue_job(self) -> Optional[Job]:
         job_id = self.queue.dequeue()
         if not job_id:
@@ -75,6 +87,8 @@ class Runner:
             return None
 
         try:
+            self._validate_repo(job.repo)
+
             if job.issue_number is not None and job.prompt is None:
                 issue = self._gh.fetch_issue(job.issue_number)
                 job.prompt = self._build_prompt(job.issue_number, self._format_issue_text(issue))
@@ -105,6 +119,9 @@ class Runner:
         pr_number = None
 
         try:
+            workspace_dir = self._validate_repo(job.repo)
+            self._command_runner.working_dir = str(workspace_dir)
+
             artifact_path = job.artifact_path
             prompt_file = artifact_path / "prompt.txt"
             prompt_file.write_text(job.prompt)

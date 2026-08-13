@@ -1,7 +1,21 @@
 from pathlib import Path
 
+from app import config
 from app.models import Job
 from app.runner import Runner
+
+VALID_REPO = "shaisachs/laws-of-software"
+
+
+def make_repo_dir(tmp_path, repo=VALID_REPO):
+    repo_dir = tmp_path / repo
+    repo_dir.mkdir(parents=True, exist_ok=True)
+    return repo_dir
+
+
+def use_workspaces(monkeypatch, tmp_path, repo=VALID_REPO):
+    monkeypatch.setattr(config, "WORKSPACES_ROOT", tmp_path)
+    return make_repo_dir(tmp_path, repo)
 
 
 class FakeQueue:
@@ -145,8 +159,9 @@ def test_dequeue_job_returns_none_when_queue_empty(tmp_path):
     assert db.fetched_ids == []
 
 
-def test_dequeue_job_uses_stored_prompt(tmp_path):
-    job = Job(job_id="abc-123", prompt="write hello world")
+def test_dequeue_job_uses_stored_prompt(tmp_path, monkeypatch):
+    repo_dir = use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
 
     result = runner.dequeue_job()
@@ -158,8 +173,9 @@ def test_dequeue_job_uses_stored_prompt(tmp_path):
     assert job.artifact_path is not None
 
 
-def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path):
-    job = Job(job_id="abc-123", prompt=None, issue_number=42)
+def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
 
     result = runner.dequeue_job()
@@ -172,8 +188,9 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(tmp_path):
     assert db.running == [job]
 
 
-def test_dequeue_job_marks_failed_on_error(tmp_path):
-    job = Job(job_id="abc-123", prompt=None, issue_number=42)
+def test_dequeue_job_marks_failed_on_error(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
 
     class Boom(FakeGithubClient):
@@ -186,6 +203,30 @@ def test_dequeue_job_marks_failed_on_error(tmp_path):
     assert db.completed == [("abc-123", "failed", "gh is down", None)]
 
 
+def test_dequeue_job_marks_failed_when_repo_missing_on_disk(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo="owner/not-cloned")
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    assert runner.dequeue_job() is None
+    assert db.running == []
+    assert len(db.completed) == 1
+    job_id, status, error, _pr = db.completed[0]
+    assert job_id == "abc-123"
+    assert status == "failed"
+    assert "not found on disk" in error
+
+
+def test_dequeue_job_marks_failed_when_repo_missing(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=None)
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    assert runner.dequeue_job() is None
+    assert db.running == []
+    assert db.completed == [("abc-123", "failed", "repo is required", None)]
+
+
 def test_complete_job_delegates_to_db(tmp_path):
     runner, db, gh, git, command_runner = make_runner(tmp_path)
 
@@ -194,13 +235,15 @@ def test_complete_job_delegates_to_db(tmp_path):
     assert db.completed == [("abc-123", "completed", None, 99)]
 
 
-def test_run_job_with_issue_number(tmp_path):
+def test_run_job_with_issue_number(tmp_path, monkeypatch):
+    repo_dir = use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
     job = Job(
         job_id="abc-123",
         prompt="fix it",
         issue_number=42,
+        repo=VALID_REPO,
         artifact_path=artifact_path,
     )
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
@@ -208,22 +251,27 @@ def test_run_job_with_issue_number(tmp_path):
     pr_number = runner.run_job(job)
 
     assert pr_number == 99
+    assert command_runner.working_dir == str(repo_dir)
     assert (artifact_path / "prompt.txt").read_text() == "fix it"
     assert (artifact_path / "output.txt").exists()
     assert ("create_branch", "feature/fix-the-bug") in git.calls
     assert ("push_to_origin", "feature/fix-the-bug") in git.calls
     assert ("create_pull_request", "feature/fix-the-bug", "main", "Fix the bug", 42) in gh.calls
     assert ("fetch_issue", 42) in gh.calls
-    assert any(c[0][0] == "opencode" for c in command_runner.calls)
+    opencode_calls = [c for (c, _in) in command_runner.calls if c[0] == "opencode"]
+    assert len(opencode_calls) == 1
+    assert opencode_calls[0][2] == str(repo_dir)
 
 
-def test_run_job_without_issue_number(tmp_path):
+def test_run_job_without_issue_number(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
     job = Job(
         job_id="abc-123",
         prompt="fix it",
         issue_number=None,
+        repo=VALID_REPO,
         artifact_path=artifact_path,
     )
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
@@ -237,13 +285,15 @@ def test_run_job_without_issue_number(tmp_path):
     assert ("commit_changes",) in git.calls
 
 
-def test_run_job_skips_commit_and_pr_when_no_changes(tmp_path):
+def test_run_job_skips_commit_and_pr_when_no_changes(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
     job = Job(
         job_id="abc-123",
         prompt="fix it",
         issue_number=42,
+        repo=VALID_REPO,
         artifact_path=artifact_path,
     )
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
