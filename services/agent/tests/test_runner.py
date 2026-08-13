@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from app import config
 from app.models import Job
 from app.runner import Runner
 
@@ -97,6 +98,13 @@ def make_runner(tmp_path, job=None, queue_job_id="abc-123"):
         command_runner=command_runner,
     )
     return runner, db, gh, git, command_runner
+
+
+def opencode_model(command_runner):
+    for cmd, _ in command_runner.calls:
+        if cmd and cmd[0] == "opencode":
+            return cmd[cmd.index("--model") + 1]
+    return None
 
 
 def test_build_prompt(tmp_path):
@@ -254,3 +262,53 @@ def test_run_job_skips_commit_and_pr_when_no_changes(tmp_path):
     assert pr_number is None
     assert not [c for c in git.calls if c[0] == "commit_changes"]
     assert "No changes staged" in (artifact_path / "output.txt").read_text()
+
+
+def test_run_job_uses_selected_model(tmp_path):
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123",
+        prompt="fix it",
+        model="deepseek/deepseek-v4-pro",
+        artifact_path=artifact_path,
+    )
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    runner.run_job(job)
+
+    assert opencode_model(command_runner) == "deepseek/deepseek-v4-pro"
+
+
+def test_run_job_uses_default_model_when_none_specified(tmp_path):
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123",
+        prompt="fix it",
+        model=None,
+        artifact_path=artifact_path,
+    )
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    runner.run_job(job)
+
+    assert opencode_model(command_runner) == config.opencode_model()
+
+
+def test_dequeue_job_marks_failed_when_model_unavailable(tmp_path):
+    job = Job(job_id="abc-123", prompt="fix it", model="nonsense/nonexistent")
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    assert runner.dequeue_job() is None
+    assert db.completed == [("abc-123", "failed", "model nonsense/nonexistent is not available", None)]
+
+
+def test_dequeue_job_accepts_available_model(tmp_path):
+    job = Job(job_id="abc-123", prompt="fix it", model="deepseek/deepseek-v4-pro")
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    result = runner.dequeue_job()
+
+    assert result is job
+    assert db.running == [job]

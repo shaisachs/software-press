@@ -18,6 +18,7 @@ The first time you spin up the system, run:
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/001_create_jobs.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/002_add_github_columns.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/003_allow_null_prompt.sql`
+`docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/004_add_model.sql`
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
@@ -36,6 +37,21 @@ curl -X POST http://localhost:8000/jobs \
 ```
 
 The agent will write and commit code to `/workspaces`, in the current branch. It will not push.
+
+### Choosing a model
+
+Both `prompt` and `issueNumber` jobs accept an optional `model` field in `provider/model` format, e.g.:
+
+```
+curl -X POST http://localhost:8000/jobs \
+    -H "Content-Type: application/json" \
+    -d '{
+        "issueNumber": 42,
+        "model": "deepseek/deepseek-v4-pro"
+    }'
+```
+
+If `model` is omitted, the default model is used (see [Models in use](#models-in-use)). If an unavailable model is specified, the job will fail.
 
 ### Github Issues
 

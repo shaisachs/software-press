@@ -37,8 +37,8 @@ def test_create_job_with_prompt(client, mocked_deps):
     cursor = conn._cursor
     sql, params = cursor.execute_calls[0]
     assert "INSERT INTO jobs" in sql
-    assert "VALUES (%s, %s, %s, 'queued')" in sql
-    assert params == (job_id, "write hello world", None)
+    assert "VALUES (%s, %s, %s, %s, 'queued')" in sql
+    assert params == (job_id, "write hello world", None, None)
     assert conn.commits == 1
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
@@ -54,9 +54,51 @@ def test_create_job_with_issue_number(client, mocked_deps):
     conn = mocked_deps["conn"]
     sql, params = conn._cursor.execute_calls[0]
     assert "INSERT INTO jobs" in sql
-    assert params == (job_id, None, 42)
+    assert params == (job_id, None, 42, None)
     assert conn.commits == 1
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
+
+
+def test_create_job_with_model(client, mocked_deps):
+    resp = client.post(
+        "/jobs",
+        json={"prompt": "write hello world", "model": "deepseek/deepseek-v4-pro"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    job_id = body["job_id"]
+    assert str(uuid.UUID(job_id)) == job_id
+
+    conn = mocked_deps["conn"]
+    sql, params = conn._cursor.execute_calls[0]
+    assert "INSERT INTO jobs" in sql
+    assert params == (job_id, "write hello world", None, "deepseek/deepseek-v4-pro")
+    assert conn.commits == 1
+    mocked_deps["enqueue_job"].assert_called_once_with(job_id)
+
+
+def test_create_job_with_issue_and_model(client, mocked_deps):
+    resp = client.post(
+        "/jobs",
+        json={"issueNumber": 42, "model": "deepseek/deepseek-v4-flash"},
+    )
+
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+
+    conn = mocked_deps["conn"]
+    sql, params = conn._cursor.execute_calls[0]
+    assert params == (job_id, None, 42, "deepseek/deepseek-v4-flash")
+
+
+def test_create_job_rejects_invalid_model_format(client, mocked_deps):
+    resp = client.post("/jobs", json={"prompt": "hi", "model": "not-a-model"})
+
+    assert resp.status_code == 400
+    assert "provider/model" in str(resp.json()["detail"])
+    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["enqueue_job"].assert_not_called()
 
 
 def test_create_job_rejects_missing_prompt_and_issue(client, mocked_deps):
@@ -87,6 +129,7 @@ def test_get_job_returns_row(client, mocked_deps):
     conn._cursor.fetchone_result = (
         "abc-123",
         "write hello world",
+        "deepseek/deepseek-v4-flash",
         "queued",
         "/artifacts/20260811180005-abc-123",
         None,
@@ -100,6 +143,7 @@ def test_get_job_returns_row(client, mocked_deps):
     assert resp.json() == {
         "id": "abc-123",
         "prompt": "write hello world",
+        "model": "deepseek/deepseek-v4-flash",
         "status": "queued",
         "artifact_path": "/artifacts/20260811180005-abc-123",
         "error": None,
@@ -111,6 +155,25 @@ def test_get_job_returns_row(client, mocked_deps):
     assert "FROM jobs" in sql
     assert "WHERE id = %s" in sql
     assert params == ("abc-123",)
+
+
+def test_get_job_returns_null_model(client, mocked_deps):
+    conn = mocked_deps["conn"]
+    conn._cursor.fetchone_result = (
+        "abc-123",
+        "write hello world",
+        None,
+        "queued",
+        None,
+        None,
+        None,
+        None,
+    )
+
+    resp = client.get("/jobs/abc-123")
+
+    assert resp.status_code == 200
+    assert resp.json()["model"] is None
 
 
 def test_get_job_returns_error_when_missing(client, mocked_deps):

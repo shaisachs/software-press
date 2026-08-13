@@ -92,6 +92,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OPENCODE_PROVIDER: deepseek
       OPENCODE_MODEL: deepseek-v4-flash
+      OPENCODE_MODELS: deepseek/deepseek-v4-flash,deepseek/deepseek-v4-pro,sp-ollama/qwen2.5:0.5b
       WORKSPACES_ROOT: /workspaces
       ARTIFACT_ROOT: /artifacts
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}

@@ -79,6 +79,8 @@ class Runner:
                 issue = self._gh.fetch_issue(job.issue_number)
                 job.prompt = self._build_prompt(job.issue_number, self._format_issue_text(issue))
 
+            config.resolve_model(job.model)
+
             job.artifact_path = self._make_artifact_path(job_id)
             job.artifact_path.mkdir(parents=True, exist_ok=True)
 
@@ -109,7 +111,7 @@ class Runner:
             prompt_file = artifact_path / "prompt.txt"
             prompt_file.write_text(job.prompt)
 
-            opencode_model = config.opencode_model()
+            opencode_model = config.resolve_model(job.model)
 
             output_file_path = artifact_path / "output.txt"
             issue = None
