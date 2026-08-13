@@ -52,7 +52,7 @@ def make_db(cursor=None):
 
 def test_fetch_job_builds_job():
     cursor = FakeCursor()
-    cursor.fetchone_result = ("hello", 42)
+    cursor.fetchone_result = ("hello", 42, "shaisachs/laws-of-software")
     db, cursor, conn = make_db(cursor)
 
     job = db.fetch_job("abc-123")
@@ -61,6 +61,7 @@ def test_fetch_job_builds_job():
     assert job.job_id == "abc-123"
     assert job.prompt == "hello"
     assert job.issue_number == 42
+    assert job.repo == "shaisachs/laws-of-software"
     assert not conn.closed
     assert cursor.closed
     assert cursor.execute_calls[0][1] == ("abc-123",)
