@@ -8,13 +8,13 @@ from app import config
 from app.command_runner import CommandRunner
 from app.db import Db
 from app.GithubClient import GithubClient
-from app.git import Git
+from app.GitClient import GitClient
 from app.models import Job
 from app.queue_redis import Queue
 
 
 class Runner:
-    def __init__(self, queue: Queue, db: Db, gh: GithubClient, git: Git, command_runner: CommandRunner):
+    def __init__(self, queue: Queue, db: Db, gh: GithubClient, git: GitClient, command_runner: CommandRunner):
         self.queue = queue
         self._db = db
         self._gh = gh
@@ -61,7 +61,7 @@ class Runner:
             queue=Queue(),
             db=Db(),
             gh=GithubClient(command_runner),
-            git=Git(command_runner),
+            git=GitClient(command_runner),
             command_runner=command_runner,
         )
 

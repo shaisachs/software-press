@@ -1,10 +1,10 @@
-from app.git import Git
+from app.GitClient import GitClient
 
 from tests.conftest import make_result
 
 
 def make_git(recording_runner):
-    return Git(recording_runner)
+    return GitClient(recording_runner)
 
 
 def test_get_default_branch(recording_runner):

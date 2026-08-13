@@ -3,7 +3,7 @@ from typing import Tuple
 from app.command_runner import CommandRunner
 
 
-class Git:
+class GitClient:
     def __init__(self, command_runner: CommandRunner):
         self.command_runner = command_runner
 
