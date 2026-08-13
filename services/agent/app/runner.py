@@ -90,7 +90,8 @@ class Runner:
             if job.model is not None and not config.model_is_available(job.model):
                 raise Exception(f"model is unavailable: {job.model}")
 
-            self._validate_repo(job.repo)
+            workspace_dir = self._validate_repo(job.repo)
+            self._command_runner.working_dir = str(workspace_dir)
 
             if job.issue_number is not None and job.prompt is None:
                 issue = self._gh.fetch_issue(job.issue_number)
