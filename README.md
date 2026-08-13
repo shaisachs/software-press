@@ -19,6 +19,7 @@ The first time you spin up the system, run:
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/002_add_github_columns.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/003_allow_null_prompt.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/004_add_repo_column.sql`
+`docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/005_add_model_column.sql`
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
@@ -33,9 +34,12 @@ curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
     -d '{
         "repo": "example/foobar",
-        "prompt": "Write a hello world Python script and save it to helloworld.py"
+        "prompt": "Write a hello world Python script and save it to helloworld.py",
+        "model": "deepseek/deepseek-v4-pro"
     }'
 ```
+
+The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used.
 
 The agent will write and commit code to `workspaces/example/foobar`, in the current branch. It will not push.
 

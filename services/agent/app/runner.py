@@ -87,6 +87,9 @@ class Runner:
             return None
 
         try:
+            if job.model is not None and not config.model_is_available(job.model):
+                raise Exception(f"model is unavailable: {job.model}")
+
             self._validate_repo(job.repo)
 
             if job.issue_number is not None and job.prompt is None:
@@ -126,7 +129,7 @@ class Runner:
             prompt_file = artifact_path / "prompt.txt"
             prompt_file.write_text(job.prompt)
 
-            opencode_model = config.opencode_model()
+            opencode_model = job.model or config.opencode_model()
 
             output_file_path = artifact_path / "output.txt"
             issue = None

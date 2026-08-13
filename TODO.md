@@ -1,4 +1,4 @@
-- [ ] allow the /jobs API to intake a provider and model so the defaults can be overridden
+- [x] allow the /jobs API to intake a provider and model so the defaults can be overridden
 - [x] mount deepseek api keys safely
 - [ ] ollama model init should be optional
 - [ ] runner - use strategy pattern so the issue-number stuff is tidied away

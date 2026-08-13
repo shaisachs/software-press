@@ -79,3 +79,33 @@ def test_issue_number_must_be_positive():
 def test_issue_number_must_be_int():
     with pytest.raises(ValidationError):
         CreateJobRequest(issueNumber="not a number", repo=VALID_REPO)
+
+
+def test_model_defaults_to_none():
+    req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
+
+    assert req.model is None
+
+
+def test_model_accepts_valid_formats():
+    for model in [
+        "deepseek/deepseek-v4-flash",
+        "deepseek/deepseek-v4-pro",
+        "sp-ollama/qwen2.5:0.5b",
+        "acme/model.with.dots",
+    ]:
+        req = CreateJobRequest(prompt="hi", repo=VALID_REPO, model=model)
+        assert req.model == model
+
+
+def test_model_rejects_invalid_formats():
+    for model in [
+        "",
+        "no-slash",
+        "provider/",
+        "/model",
+        "provider/model/extra",
+        "provider/model name",
+    ]:
+        with pytest.raises(ValidationError):
+            CreateJobRequest(prompt="hi", repo=VALID_REPO, model=model)
