@@ -144,19 +144,18 @@ class Runner:
 
                 self._run_prompt(opencode_model, job.prompt)
 
-                if not self._git.try_stage_changes():
+                if self._git.try_stage_changes():
+                    self._git.commit_changes()
+
+                    if job.issue_number is not None:
+                        self._git.push_to_origin(branch)
+
+                        title = f"Resolves #{job.issue_number}" if issue is None else issue['title']
+                        pr_number = self._gh.create_pull_request(branch, default_branch, title, job.issue_number)
+                else:
                     output_file.write("No changes staged; skipping commit and pull request.\n")
-                    return None
 
-                self._git.commit_changes()
-
-                if job.issue_number is not None:
-                    self._git.push_to_origin(branch)
-
-                    title = f"Resolves #{job.issue_number}" if issue is None else issue['title']
-                    pr_number = self._gh.create_pull_request(branch, default_branch, title, job.issue_number)
-
-                    self._git.checkout_branch(default_branch)
+                self._git.checkout_branch(default_branch)
         except Exception as e:
             print("Error running job! " + str(e))
             return None
