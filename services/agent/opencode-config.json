@@ -36,7 +36,10 @@
     "edit": "allow",
     "read": "allow",
     "grep": "allow",
-    "glob": "allow"
+    "glob": "allow",
+    "external_directory": {
+      "/tmp/**": "allow"
+    }
   },
   "autoupdate": false
 }
