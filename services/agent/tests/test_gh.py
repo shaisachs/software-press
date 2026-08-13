@@ -82,7 +82,7 @@ def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch):
 
     gh = Gh(recording_runner)
     pr_number = gh.create_pull_request(
-        "feature/issue-42", "main", 42
+        "feature/issue-42", "main", "Do something", 42
     )
 
     assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
@@ -98,7 +98,7 @@ def test_create_pull_request_uses_fill_without_issue(recording_runner, monkeypat
     )
 
     gh = Gh(recording_runner)
-    gh.create_pull_request("feature/foo", "main", None)
+    gh.create_pull_request("feature/foo", "main", "Foo", None)
 
     fill_call = [c for (c, _in) in recording_runner.calls if "--fill" in c]
     assert len(fill_call) == 1
@@ -111,7 +111,7 @@ def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch
 
     gh = Gh(recording_runner)
     pr_number = gh.create_pull_request(
-        "feature/issue-42", "main", 42
+        "feature/issue-42", "main", "Do something", 42
     )
 
     assert pr_number is None

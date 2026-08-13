@@ -49,6 +49,7 @@ class Gh:
         self,
         branch: str,
         default_branch: str,
+        title: str,
         issue_number: Optional[int],
     ) -> Optional[int]:
         self._ensure_gh_auth()
@@ -56,7 +57,7 @@ class Gh:
         cmd = ["gh", "pr", "create", "--base", default_branch, "--head", branch]
         if issue_number:
             cmd += [
-                "--title", f"Resolve issue #{issue_number}",
+                "--title", title,
                 "--body", f"Closes #{issue_number}",
             ]
         else:

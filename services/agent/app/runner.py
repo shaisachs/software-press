@@ -112,6 +112,7 @@ class Runner:
             opencode_model = config.opencode_model()
 
             output_file_path = artifact_path / "output.txt"
+            issue = None
             with open(output_file_path, "w", encoding="utf-8") as output_file:
                 self._command_runner.output_file = output_file
 
@@ -130,7 +131,9 @@ class Runner:
 
                 if job.issue_number is not None:
                     self._git.push_to_origin(branch)
-                    pr_number = self._gh.create_pull_request(branch, default_branch, job.issue_number)
+
+                    title = f"Resolves #{job.issue_number}" if issue is None else issue['title']
+                    pr_number = self._gh.create_pull_request(branch, default_branch, title, job.issue_number)
         except Exception as e:
             print("Error running job! " + str(e))
             return None

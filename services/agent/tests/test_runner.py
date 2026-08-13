@@ -65,8 +65,8 @@ class FakeGh:
         self.calls.append(("fetch_issue", issue_number))
         return self.issue
 
-    def create_pull_request(self, branch, default_branch, issue_number):
-        self.calls.append(("create_pull_request", branch, default_branch, issue_number))
+    def create_pull_request(self, branch, default_branch, title, issue_number):
+        self.calls.append(("create_pull_request", branch, default_branch, title, issue_number))
         return self.pr_number
 
 
@@ -209,7 +209,7 @@ def test_run_job_with_issue_number(tmp_path):
     assert (artifact_path / "output.txt").exists()
     assert ("create_branch", "feature/fix-the-bug") in git.calls
     assert ("push_to_origin", "feature/fix-the-bug") in git.calls
-    assert ("create_pull_request", "feature/fix-the-bug", "main", 42) in gh.calls
+    assert ("create_pull_request", "feature/fix-the-bug", "main", "Fix the bug", 42) in gh.calls
     assert ("fetch_issue", 42) in gh.calls
     assert any(c[0][0] == "opencode" for c in command_runner.calls)
 
