@@ -227,6 +227,31 @@ def test_dequeue_job_marks_failed_when_repo_missing(tmp_path, monkeypatch):
     assert db.completed == [("abc-123", "failed", "repo is required", None)]
 
 
+def test_dequeue_job_marks_failed_when_model_unavailable(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/not-a-model")
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    monkeypatch.setattr(config, "model_is_available", lambda model: False)
+
+    assert runner.dequeue_job() is None
+    assert db.running == []
+    assert db.completed == [("abc-123", "failed", "model is unavailable: deepseek/not-a-model", None)]
+
+
+def test_dequeue_job_accepts_available_model(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/deepseek-v4-pro")
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    monkeypatch.setattr(config, "model_is_available", lambda model: True)
+
+    result = runner.dequeue_job()
+
+    assert result is job
+    assert db.running == [job]
+
+
 def test_complete_job_delegates_to_db(tmp_path):
     runner, db, gh, git, command_runner = make_runner(tmp_path)
 
@@ -261,6 +286,28 @@ def test_run_job_with_issue_number(tmp_path, monkeypatch):
     opencode_calls = [c for (c, _in) in command_runner.calls if c[0] == "opencode"]
     assert len(opencode_calls) == 1
     assert opencode_calls[0][2] == str(repo_dir)
+    assert opencode_calls[0][4] == config.opencode_model()
+
+
+def test_run_job_uses_selected_model(tmp_path, monkeypatch):
+    repo_dir = use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123",
+        prompt="fix it",
+        repo=VALID_REPO,
+        model="deepseek/deepseek-v4-pro",
+        artifact_path=artifact_path,
+    )
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    pr_number = runner.run_job(job)
+
+    assert pr_number is None
+    opencode_calls = [c for (c, _in) in command_runner.calls if c[0] == "opencode"]
+    assert len(opencode_calls) == 1
+    assert opencode_calls[0][4] == "deepseek/deepseek-v4-pro"
 
 
 def test_run_job_without_issue_number(tmp_path, monkeypatch):

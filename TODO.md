@@ -1,6 +1,7 @@
-- [ ] allow the /jobs API to intake a provider and model so the defaults can be overridden
+- [x] allow the /jobs API to intake a provider and model so the defaults can be overridden
 - [x] mount deepseek api keys safely
 - [ ] ollama model init should be optional
 - [ ] runner - use strategy pattern so the issue-number stuff is tidied away
 - [ ] resiliency around failed commands and repo in a weird state, etc.
 - [ ] automatically do all migrations that are not-done when postgres starts up
+- [ ] real mocking setup for unit tests

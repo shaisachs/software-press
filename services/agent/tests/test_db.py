@@ -52,7 +52,7 @@ def make_db(cursor=None):
 
 def test_fetch_job_builds_job():
     cursor = FakeCursor()
-    cursor.fetchone_result = ("hello", 42, "shaisachs/laws-of-software")
+    cursor.fetchone_result = ("hello", 42, "shaisachs/laws-of-software", "deepseek/deepseek-v4-flash")
     db, cursor, conn = make_db(cursor)
 
     job = db.fetch_job("abc-123")
@@ -62,6 +62,7 @@ def test_fetch_job_builds_job():
     assert job.prompt == "hello"
     assert job.issue_number == 42
     assert job.repo == "shaisachs/laws-of-software"
+    assert job.model == "deepseek/deepseek-v4-flash"
     assert not conn.closed
     assert cursor.closed
     assert cursor.execute_calls[0][1] == ("abc-123",)
