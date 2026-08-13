@@ -35,3 +35,7 @@ class Git:
         self.command_runner.run(
             ["git", "push", "--set-upstream", "origin", branch]
         )
+
+    def checkout_branch(self, branch: str):
+        self.command_runner.run(["git", "checkout", branch ])
+

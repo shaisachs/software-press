@@ -71,3 +71,10 @@ def test_push_to_origin(recording_runner):
     assert ["git", "push", "--set-upstream", "origin", "feature/issue-42"] in [
         c for (c, _in) in recording_runner.calls
     ]
+
+def test_checkout_branch(recording_runner):
+    git = make_git(recording_runner)
+    git.checkout_branch("feature/foo")
+
+    assert ["git", "commit", "feature/foo"] in [c for (c, _in) in recording_runner.calls]
+

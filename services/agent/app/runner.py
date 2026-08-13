@@ -134,6 +134,8 @@ class Runner:
 
                     title = f"Resolves #{job.issue_number}" if issue is None else issue['title']
                     pr_number = self._gh.create_pull_request(branch, default_branch, title, job.issue_number)
+
+                    self._git.checkout_branch(default_branch)
         except Exception as e:
             print("Error running job! " + str(e))
             return None
