@@ -76,5 +76,5 @@ def test_checkout_branch(recording_runner):
     git = make_git(recording_runner)
     git.checkout_branch("feature/foo")
 
-    assert ["git", "commit", "feature/foo"] in [c for (c, _in) in recording_runner.calls]
+    assert ["git", "checkout", "feature/foo"] in [c for (c, _in) in recording_runner.calls]
 

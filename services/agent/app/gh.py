@@ -6,7 +6,7 @@ from typing import Optional
 from app.command_runner import CommandRunner
 
 
-class Gh:
+class GithubClient:
     def __init__(self, command_runner: CommandRunner):
         self.command_runner = command_runner
 

@@ -1,6 +1,6 @@
 import json
 
-from app.gh import Gh
+from app.gh import GithubClient
 
 from tests.conftest import make_result
 
@@ -8,7 +8,7 @@ from tests.conftest import make_result
 def test_ensure_gh_auth_skips_without_token(recording_runner, monkeypatch):
     monkeypatch.delenv("GH_TOKEN", raising=False)
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
     assert recording_runner.calls == []
@@ -18,7 +18,7 @@ def test_ensure_gh_auth_skips_when_already_authenticated(recording_runner, monke
     monkeypatch.setenv("GH_TOKEN", "secret")
     recording_runner.on("auth status", make_result(returncode=0))
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
     assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
@@ -29,7 +29,7 @@ def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypat
     monkeypatch.setenv("GH_TOKEN", "secret")
     recording_runner.on("auth status", make_result(returncode=1))
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
     login_call = [c for (c, _in) in recording_runner.calls if "login" in c]
@@ -48,7 +48,7 @@ def test_fetch_issue_returns_well_formed_json(recording_runner, monkeypatch):
     }
     recording_runner.on("issue view", make_result(stdout=json.dumps(payload)))
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     issue = gh.fetch_issue(42)
 
     assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
@@ -63,7 +63,7 @@ def test_fetch_issue_raises_on_error(recording_runner, monkeypatch):
     recording_runner.on("auth status", make_result(returncode=0))
     recording_runner.on("issue view", make_result(returncode=1, stderr="boom"))
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     try:
         gh.fetch_issue(42)
     except Exception as e:
@@ -80,7 +80,7 @@ def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch):
         make_result(stdout="https://github.com/acme/repo/pull/123\n"),
     )
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     pr_number = gh.create_pull_request(
         "feature/issue-42", "main", "Do something", 42
     )
@@ -97,7 +97,7 @@ def test_create_pull_request_uses_fill_without_issue(recording_runner, monkeypat
         make_result(stdout="https://github.com/acme/repo/pull/123\n"),
     )
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     gh.create_pull_request("feature/foo", "main", "Foo", None)
 
     fill_call = [c for (c, _in) in recording_runner.calls if "--fill" in c]
@@ -109,7 +109,7 @@ def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch
     recording_runner.on("auth status", make_result(returncode=0))
     recording_runner.on("pr create", make_result(returncode=1))
 
-    gh = Gh(recording_runner)
+    gh = GithubClient(recording_runner)
     pr_number = gh.create_pull_request(
         "feature/issue-42", "main", "Do something", 42
     )

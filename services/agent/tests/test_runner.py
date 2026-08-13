@@ -49,8 +49,11 @@ class FakeGit:
     def push_to_origin(self, branch):
         self.calls.append(("push_to_origin", branch))
 
+    def checkout_branch(self, branch):
+        self.calls.append(("checkout_branch", branch))
 
-class FakeGh:
+
+class FakeGithubClient:
     def __init__(self, pr_number=99, issue=None):
         self.pr_number = pr_number
         self.issue = issue if issue is not None else {
@@ -83,7 +86,7 @@ class FakeCommandRunner:
 def make_runner(tmp_path, job=None, queue_job_id="abc-123"):
     queue = FakeQueue(queue_job_id)
     db = FakeDb(job)
-    gh = FakeGh()
+    gh = FakeGithubClient()
     git = FakeGit()
     command_runner = FakeCommandRunner()
     runner = Runner(
@@ -173,7 +176,7 @@ def test_dequeue_job_marks_failed_on_error(tmp_path):
     job = Job(job_id="abc-123", prompt=None, issue_number=42)
     runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
 
-    class Boom(FakeGh):
+    class Boom(FakeGithubClient):
         def fetch_issue(self, issue_number):
             raise Exception("gh is down")
 

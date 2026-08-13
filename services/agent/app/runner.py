@@ -7,14 +7,14 @@ from typing import Optional
 from app import config
 from app.command_runner import CommandRunner
 from app.db import Db
-from app.gh import Gh
+from app.gh import GithubClient
 from app.git import Git
 from app.models import Job
 from app.queue_redis import Queue
 
 
 class Runner:
-    def __init__(self, queue: Queue, db: Db, gh: Gh, git: Git, command_runner: CommandRunner):
+    def __init__(self, queue: Queue, db: Db, gh: GithubClient, git: Git, command_runner: CommandRunner):
         self.queue = queue
         self._db = db
         self._gh = gh
@@ -60,7 +60,7 @@ class Runner:
         return cls(
             queue=Queue(),
             db=Db(),
-            gh=Gh(command_runner),
+            gh=GithubClient(command_runner),
             git=Git(command_runner),
             command_runner=command_runner,
         )
