@@ -1,6 +1,6 @@
 import json
 
-from app.gh import GithubClient
+from app.GithubClient import GithubClient
 
 from tests.conftest import make_result
 

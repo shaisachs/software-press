@@ -7,7 +7,7 @@ from typing import Optional
 from app import config
 from app.command_runner import CommandRunner
 from app.db import Db
-from app.gh import GithubClient
+from app.GithubClient import GithubClient
 from app.git import Git
 from app.models import Job
 from app.queue_redis import Queue
