@@ -23,7 +23,7 @@ The first time you spin up the system, run:
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/004_add_repo_column.sql`
 `docker exec -i sp-postgres psql -U sp_user -d software_press < migrations/005_add_model_column.sql`
 
-NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
+NB the first `up` command will download a local model (Qwen 2.5 0.5B), which will take a while.
 
 ## Usage
 
