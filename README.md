@@ -2,6 +2,8 @@
 
 Containerized agentic system for writing and reviewing software.
 
+See [docs/architecture.md](docs/architecture.md) for an overview of how the system works, the containers involved, and a Mermaid diagram of the architecture.
+
 ## Setup:
 
 * Copy `.env` to `.env.prod`.
