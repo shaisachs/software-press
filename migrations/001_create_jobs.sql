@@ -1,3 +1,4 @@
+-- Create the jobs table.
 CREATE TABLE jobs (
     id UUID PRIMARY KEY,
     prompt TEXT NOT NULL,

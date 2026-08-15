@@ -51,6 +51,19 @@ services:
     environment:
       OLLAMA_CONTEXT_LENGTH: 65536
 
+  db-migrate:
+    image: python:3.11-slim
+    container_name: sp-db-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+      - ./scripts:/scripts
+    environment:
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
+    entrypoint: ["/bin/sh", "/scripts/migrate.sh"]
+
   api:
     build: ./services/api
     container_name: sp-api
@@ -60,6 +73,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://sp_user:sp_password@postgres:5432/software_press
       REDIS_URL: redis://redis:6379
@@ -80,6 +95,8 @@ services:
         condition: service_healthy
       ollama:
         condition: service_started
+      db-migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     volumes:
       - ./artifacts:/artifacts

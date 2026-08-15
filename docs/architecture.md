@@ -37,7 +37,6 @@ flowchart LR
         RD[("sp-redis<br/>Redis 7<br/>'jobs' queue")]
 
         OLL["sp-ollama<br/>Ollama<br/>local models"]
-        OLLINIT["sp-ollama-init<br/>one-shot bootstrap<br/>(scripts/bootstrap.sh)"]
     end
 
     WORKSPACE["workspaces/<org>/<repo><br/>checked-out git repos"]
@@ -54,7 +53,6 @@ flowchart LR
     AGENT -->|"opencode edits + commits"| WORKSPACE
     AGENT -->|"gh issue / gh pr"| GH
 
-    OLLINIT -->|"pull model"| OLL
     AGENT -->|"OpenAI-compatible /v1"| OLL
     AGENT -->|"OpenAI-compatible /v1"| DS
 ```
@@ -96,6 +94,15 @@ Redis `jobs` queue. For each job it:
    request via `gh pr create`; for ad hoc jobs it only commits locally.
 8. Records `completed`/`failed` status, any error, and the PR number in
    Postgres.
+
+### sp-db-migrate - database migrations
+
+`sp-db-migrate` is a one-shot container (like `sp-ollama-init`) that installs
+[yoyo](https://pypi.org/project/yoyo-migrations/), applies any new migrations in
+`migrations/` to Postgres idempotently, and exits. It runs on every `up`, before
+`sp-api` and `sp-agent` start (`condition: service_completed_successfully`). The
+entrypoint is `scripts/migrate.sh`; running it with the `mark` argument records
+migrations as already applied without running them.
 
 ### sp-postgres - job store
 
