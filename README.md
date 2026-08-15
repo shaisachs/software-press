@@ -23,14 +23,6 @@ The first time you spin up the system, run:
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
-## Tests
-
-Run the unit tests for both services entirely inside Docker - no local Python toolchain is required:
-
-`scripts/test.sh`
-
-The script builds a throwaway image for each service (from its `requirements.txt`) and runs `pytest` in it.
-
 ## Usage
 
 ### Ad hoc prompts
@@ -87,6 +79,12 @@ We have configured two providers and three models:
 The Qwen model is quite underpowered so it is not recommended for daily coding, but it is suitable for testing Ollama connectivity. With sufficient hardware you can run a more powerful local model.
 
 The Deepseek models require API keys. Flash is recommended for lightweight tasks, Pro for more heavy-duty tasks. Flash is the default.
+
+## Tests
+
+Run the unit tests for both services:
+
+`scripts/test.sh`
 
 ## Debugging
 
