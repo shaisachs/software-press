@@ -13,12 +13,7 @@ do
   sleep 2
 done
 
-if [ "$1" = "mark" ]; then
-  echo "Recording migrations as already applied (without running them)..."
-  yoyo --batch -vv mark --database "$DATABASE_URL" /migrations
-else
-  echo "Applying migrations..."
-  yoyo --batch -vv apply --database "$DATABASE_URL" /migrations
-fi
+echo "Applying migrations..."
+yoyo --batch -vv apply --database "$DATABASE_URL" /migrations
 
 echo "Migrations complete."
