@@ -26,35 +26,32 @@ the actual editing against a checked-out copy of your repository.
 
 ```mermaid
 flowchart LR
-    Client["Client<br/>(curl / CI)"] -->|"POST /jobs"| API
-    Client -->|"GET /jobs/{id}"| API
+    Client["Client"] -->|"POST /jobs"| API
 
     subgraph Docker
-        API["sp-api<br/>FastAPI app<br/>(services/api)"]
-        AGENT["sp-agent<br/>worker + opencode<br/>(services/agent)"]
+        API["sp-api<br/>(services/api)"]
+        AGENT["sp-agent<br/>(services/agent)"]
 
-        PG[("sp-postgres<br/>Postgres 16<br/>jobs table")]
-        RD[("sp-redis<br/>Redis 7<br/>'jobs' queue")]
+        PG[("sp-postgres")]
+        RD[("sp-redis")]
 
-        OLL["sp-ollama<br/>Ollama<br/>local models"]
+        OLL["sp-ollama"]
     end
 
-    WORKSPACE["workspaces/<org>/<repo><br/>checked-out git repos"]
     GH["GitHub<br/>(issues, PRs)"]
 
-    DS["DeepSeek API<br/>(cloud models)"]
+    DS["DeepSeek"]
 
-    API -->|"insert job"| PG
-    API -->|"rpush job id"| RD
+    API --> PG
+    API -->|"enqueue job"| RD
 
-    AGENT -->|"blpop job id"| RD
-    AGENT -->|"fetch / update job"| PG
+    RD -->|"dequeue job"| AGENT
+    AGENT --> PG
 
-    AGENT -->|"opencode edits + commits"| WORKSPACE
-    AGENT -->|"gh issue / gh pr"| GH
+    AGENT --> GH
 
-    AGENT -->|"OpenAI-compatible /v1"| OLL
-    AGENT -->|"OpenAI-compatible /v1"| DS
+    AGENT --> OLL
+    AGENT --> DS
 ```
 
 ## Components
