@@ -2,7 +2,7 @@ from pathlib import Path
 
 from app import config
 from app.models import Job
-from app.runner import Runner
+from app.runner import JobRunner
 
 VALID_REPO = "shaisachs/laws-of-software"
 
@@ -103,7 +103,7 @@ def make_runner(tmp_path, job=None, queue_job_id="abc-123"):
     gh = FakeGithubClient()
     git = FakeGit()
     command_runner = FakeCommandRunner()
-    runner = Runner(
+    runner = JobRunner(
         queue=queue,
         db=db,
         gh=gh,
