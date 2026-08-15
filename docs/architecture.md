@@ -36,10 +36,7 @@ flowchart LR
         PG[("sp-postgres<br/>Postgres 16<br/>jobs table")]
         RD[("sp-redis<br/>Redis 7<br/>'jobs' queue")]
 
-        MIG["sp-db-migrate<br/>one-shot migrations<br/>(scripts/migrate.sh)"]
-
         OLL["sp-ollama<br/>Ollama<br/>local models"]
-        OLLINIT["sp-ollama-init<br/>one-shot bootstrap<br/>(scripts/bootstrap.sh)"]
     end
 
     WORKSPACE["workspaces/<org>/<repo><br/>checked-out git repos"]
@@ -47,7 +44,6 @@ flowchart LR
 
     DS["DeepSeek API<br/>(cloud models)"]
 
-    MIG -->|"yoyo apply"| PG
     API -->|"insert job"| PG
     API -->|"rpush job id"| RD
 
@@ -57,7 +53,6 @@ flowchart LR
     AGENT -->|"opencode edits + commits"| WORKSPACE
     AGENT -->|"gh issue / gh pr"| GH
 
-    OLLINIT -->|"pull model"| OLL
     AGENT -->|"OpenAI-compatible /v1"| OLL
     AGENT -->|"OpenAI-compatible /v1"| DS
 ```

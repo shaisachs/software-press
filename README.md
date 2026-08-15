@@ -15,17 +15,6 @@ To start:
 
 `docker compose up --env-file .env.prod`
 
-Migrations are applied automatically on every `up` by the one-shot `sp-db-migrate`
-container, which uses [yoyo](https://pypi.org/project/yoyo-migrations/) to apply any
-new migrations to the database idempotently. The `sp-api` and `sp-agent` containers
-only start once the migrations have completed successfully.
-
-If you previously applied migrations 1-5 by hand (with `psql`), run this one-time
-command to record them as already applied, so yoyo doesn't try to re-apply them to
-an existing schema:
-
-`docker compose --env-file .env.prod run --rm db-migrate mark`
-
 NB the first `up` command will download a local model (Qwen 2.5 0.5B), which will take a while.
 
 ## Usage
