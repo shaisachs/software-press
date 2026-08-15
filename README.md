@@ -23,6 +23,14 @@ The first time you spin up the system, run:
 
 NB the first `up` command `up` will download a local model (Qwen 2.5 0.5B), which will take a while.
 
+## Tests
+
+Run the unit tests for both services entirely inside Docker - no local Python toolchain is required:
+
+`scripts/test.sh`
+
+The script builds a throwaway image for each service (from its `requirements.txt`) and runs `pytest` in it.
+
 ## Usage
 
 ### Ad hoc prompts
