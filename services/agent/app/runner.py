@@ -20,6 +20,11 @@ class Runner:
         self._gh = gh
         self._git = git
         self._command_runner = command_runner
+        self._busy = False
+
+    @property
+    def busy(self) -> bool:
+        return self._busy
 
     @staticmethod
     def _format_issue_text(issue: dict) -> str:
@@ -78,6 +83,9 @@ class Runner:
         return workspace_dir
 
     def dequeue_job(self) -> Optional[Job]:
+        if self._busy:
+            return None
+
         job_id = self.queue.dequeue()
         if not job_id:
             return None
@@ -105,6 +113,7 @@ class Runner:
             self.complete_job(job_id, 'failed', str(e))
             return None
 
+        self._busy = True
         return job
 
     def _run_prompt(self, model: str, prompt: str):
@@ -166,6 +175,7 @@ class Runner:
 
     def complete_job(self, job_id: str, status: str, error_desc: str, pr_number=None):
         self._db.complete_job(job_id, status, error_desc, pr_number)
+        self._busy = False
 
 
 def main():

@@ -159,6 +159,38 @@ def test_dequeue_job_returns_none_when_queue_empty(tmp_path):
     assert db.fetched_ids == []
 
 
+def test_dequeue_job_returns_none_while_busy(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    first = runner.dequeue_job()
+
+    assert first is job
+    assert runner.busy
+    assert db.fetched_ids == ["abc-123"]
+
+    second = runner.dequeue_job()
+    assert second is None
+    assert runner.busy
+    assert db.fetched_ids == ["abc-123"]
+
+
+def test_complete_job_clears_busy(tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    runner, db, gh, git, command_runner = make_runner(tmp_path, job=job)
+
+    assert runner.dequeue_job() is job
+    assert runner.busy
+
+    runner.complete_job("abc-123", "completed", None, pr_number=99)
+
+    assert not runner.busy
+    assert runner.dequeue_job() is job
+    assert db.fetched_ids == ["abc-123", "abc-123"]
+
+
 def test_dequeue_job_uses_stored_prompt(tmp_path, monkeypatch):
     repo_dir = use_workspaces(monkeypatch, tmp_path)
     job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
