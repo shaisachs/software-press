@@ -3,7 +3,7 @@ from unittest import mock
 from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
-from app.work_item import RunResult, WorkItem
+from app.work_item import WorkItem
 
 from tests.conftest import (
     VALID_REPO,
@@ -130,7 +130,7 @@ def test_dequeue_job_marks_failed_on_error(mocker, tmp_path, monkeypatch):
 
     assert runner.dequeue_job() is None
     assert not runner.busy
-    db.complete_job.assert_called_once_with("abc-123", "failed", "gh is down")
+    db.complete_job.assert_called_once_with("abc-123", "failed", "Error dequeueing job! gh is down")
 
 
 def test_dequeue_job_marks_failed_when_repo_missing_on_disk(mocker, tmp_path, monkeypatch):
@@ -153,7 +153,7 @@ def test_dequeue_job_marks_failed_when_repo_missing(mocker, tmp_path, monkeypatc
 
     assert runner.dequeue_job() is None
     db.mark_running.assert_not_called()
-    db.complete_job.assert_called_once_with("abc-123", "failed", "repo is required")
+    db.complete_job.assert_called_once_with("abc-123", "failed", "Error dequeueing job! repo is required")
 
 
 def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monkeypatch):
@@ -165,7 +165,7 @@ def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monke
 
     assert runner.dequeue_job() is None
     db.mark_running.assert_not_called()
-    db.complete_job.assert_called_once_with("abc-123", "failed", "model is unavailable: deepseek/not-a-model")
+    db.complete_job.assert_called_once_with("abc-123", "failed", "Error dequeueing job! model is unavailable: deepseek/not-a-model")
 
 
 def test_dequeue_job_accepts_available_model(mocker, tmp_path, monkeypatch):
@@ -198,14 +198,13 @@ def test_run_job_delegates_to_work_item(mocker, tmp_path):
         job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
     )
     work_item.command_runner = mocker.Mock()
-    work_item.run.return_value = RunResult(pr_number=99, changes_staged=True)
 
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
 
-    pr_number = runner.run_job(work_item)
+    result = runner.run_job(work_item)
 
     work_item.run.assert_called_once_with()
-    assert pr_number == 99
+    assert result is None
 
 
 def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatch):
@@ -280,7 +279,7 @@ def test_run_job_skips_no_changes_message_when_changes_staged(mocker, tmp_path, 
     assert "No changes staged" not in (artifact_path / "output.txt").read_text()
 
 
-def test_run_job_returns_none_when_work_item_raises(mocker, tmp_path, monkeypatch, capsys):
+def test_run_job_returns_none_when_work_item_raises(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
@@ -294,7 +293,7 @@ def test_run_job_returns_none_when_work_item_raises(mocker, tmp_path, monkeypatc
 
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
-    pr_number = runner.run_job(work_item)
+    result = runner.run_job(work_item)
 
-    assert pr_number is None
-    assert "boom" in capsys.readouterr().out
+    assert result is None
+    db.complete_job.assert_called_once_with("abc-123", "failed", "Error running job! boom")
