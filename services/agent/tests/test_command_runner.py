@@ -1,16 +1,13 @@
-from unittest import mock
-
 from app.command_runner import CommandRunner
 
 from tests.conftest import make_result
 
 
-def test_run_uses_working_dir(tmp_path, monkeypatch):
-    result = make_result(returncode=0, stdout="stdout-line\n", stderr="stderr-line\n")
-    fake_run = mock.Mock(return_value=result)
-    monkeypatch.setattr("app.command_runner.subprocess.run", fake_run)
+def test_run_uses_working_dir(tmp_path, mocker):
+    result = make_result(mocker, returncode=0, stdout="stdout-line\n", stderr="stderr-line\n")
+    fake_run = mocker.patch("app.command_runner.subprocess.run", return_value=result)
 
-    output_file = mock.Mock()
+    output_file = mocker.Mock()
     runner = CommandRunner(str(tmp_path), output_file)
     returned = runner.run(["git", "status"])
 
@@ -25,10 +22,9 @@ def test_run_uses_working_dir(tmp_path, monkeypatch):
     output_file.write.assert_called()
 
 
-def test_run_without_output_file(tmp_path, monkeypatch):
-    result = make_result(returncode=0, stdout="out", stderr="")
-    fake_run = mock.Mock(return_value=result)
-    monkeypatch.setattr("app.command_runner.subprocess.run", fake_run)
+def test_run_without_output_file(tmp_path, mocker):
+    result = make_result(mocker, returncode=0, stdout="out", stderr="")
+    fake_run = mocker.patch("app.command_runner.subprocess.run", return_value=result)
 
     runner = CommandRunner(str(tmp_path))
     returned = runner.run(["echo", "hi"])
@@ -37,10 +33,9 @@ def test_run_without_output_file(tmp_path, monkeypatch):
     fake_run.assert_called_once()
 
 
-def test_run_passes_input(tmp_path, monkeypatch):
-    result = make_result(returncode=0, stdout="ok", stderr="")
-    fake_run = mock.Mock(return_value=result)
-    monkeypatch.setattr("app.command_runner.subprocess.run", fake_run)
+def test_run_passes_input(tmp_path, mocker):
+    result = make_result(mocker, returncode=0, stdout="ok", stderr="")
+    fake_run = mocker.patch("app.command_runner.subprocess.run", return_value=result)
 
     runner = CommandRunner(str(tmp_path))
     runner.run(["gh", "auth", "login"], input="secret")

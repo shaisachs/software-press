@@ -11,57 +11,57 @@ def test_ensure_gh_auth_skips_without_token(recording_runner, monkeypatch):
     gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
-    assert recording_runner.calls == []
+    recording_runner.run.assert_not_called()
 
 
-def test_ensure_gh_auth_skips_when_already_authenticated(recording_runner, monkeypatch):
+def test_ensure_gh_auth_skips_when_already_authenticated(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
 
     gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
-    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
-    assert not [c for (c, _in) in recording_runner.calls if "login" in c]
+    recording_runner.run.assert_any_call(["gh", "auth", "status"])
+    assert not [c.args[0] for c in recording_runner.run.call_args_list if "login" in c.args[0]]
 
 
-def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypatch):
+def test_ensure_gh_auth_logs_in_when_unauthenticated(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=1))
+    recording_runner.on("auth status", make_result(mocker, returncode=1))
 
     gh = GithubClient(recording_runner)
     gh._ensure_gh_auth()
 
-    login_call = [c for (c, _in) in recording_runner.calls if "login" in c]
-    assert len(login_call) == 1
-    assert login_call[0] == ["gh", "auth", "login", "--with-token"]
+    login_calls = [c.args[0] for c in recording_runner.run.call_args_list if "login" in c.args[0]]
+    assert len(login_calls) == 1
+    assert login_calls[0] == ["gh", "auth", "login", "--with-token"]
 
 
-def test_fetch_issue_returns_well_formed_json(recording_runner, monkeypatch):
+def test_fetch_issue_returns_well_formed_json(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
     payload = {
         "number": 42,
         "title": "Refactor things",
         "body": "Please refactor.",
         "comments": [{"body": "First comment"}, {"body": "Second comment"}],
     }
-    recording_runner.on("issue view", make_result(stdout=json.dumps(payload)))
+    recording_runner.on("issue view", make_result(mocker, stdout=json.dumps(payload)))
 
     gh = GithubClient(recording_runner)
     issue = gh.fetch_issue(42)
 
-    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
+    recording_runner.run.assert_any_call(["gh", "auth", "status"])
     assert issue == payload
-    assert ["gh", "issue", "view", "42", "--comments", "--json", "number,title,body,comments"] in [
-        c for (c, _in) in recording_runner.calls
-    ]
+    recording_runner.run.assert_any_call(
+        ["gh", "issue", "view", "42", "--comments", "--json", "number,title,body,comments"]
+    )
 
 
-def test_fetch_issue_raises_on_error(recording_runner, monkeypatch):
+def test_fetch_issue_raises_on_error(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
-    recording_runner.on("issue view", make_result(returncode=1, stderr="boom"))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
+    recording_runner.on("issue view", make_result(mocker, returncode=1, stderr="boom"))
 
     gh = GithubClient(recording_runner)
     try:
@@ -72,12 +72,12 @@ def test_fetch_issue_raises_on_error(recording_runner, monkeypatch):
         raise AssertionError("expected an exception")
 
 
-def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch):
+def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
     recording_runner.on(
         "pr create",
-        make_result(stdout="https://github.com/acme/repo/pull/123\n"),
+        make_result(mocker, stdout="https://github.com/acme/repo/pull/123\n"),
     )
 
     gh = GithubClient(recording_runner)
@@ -85,29 +85,29 @@ def test_create_pull_request_returns_pr_number(recording_runner, monkeypatch):
         "feature/issue-42", "main", "Do something", 42
     )
 
-    assert ["gh", "auth", "status"] in [c for (c, _in) in recording_runner.calls]
+    recording_runner.run.assert_any_call(["gh", "auth", "status"])
     assert pr_number == 123
 
 
-def test_create_pull_request_uses_fill_without_issue(recording_runner, monkeypatch):
+def test_create_pull_request_uses_fill_without_issue(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
     recording_runner.on(
         "pr create",
-        make_result(stdout="https://github.com/acme/repo/pull/123\n"),
+        make_result(mocker, stdout="https://github.com/acme/repo/pull/123\n"),
     )
 
     gh = GithubClient(recording_runner)
     gh.create_pull_request("feature/foo", "main", "Foo", None)
 
-    fill_call = [c for (c, _in) in recording_runner.calls if "--fill" in c]
-    assert len(fill_call) == 1
+    fill_calls = [c.args[0] for c in recording_runner.run.call_args_list if "--fill" in c.args[0]]
+    assert len(fill_calls) == 1
 
 
-def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch):
+def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch, mocker):
     monkeypatch.setenv("GH_TOKEN", "secret")
-    recording_runner.on("auth status", make_result(returncode=0))
-    recording_runner.on("pr create", make_result(returncode=1))
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
+    recording_runner.on("pr create", make_result(mocker, returncode=1))
 
     gh = GithubClient(recording_runner)
     pr_number = gh.create_pull_request(
