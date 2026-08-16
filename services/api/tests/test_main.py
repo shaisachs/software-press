@@ -35,13 +35,11 @@ def test_create_job_with_prompt(client, mocked_deps):
     job_id = body["job_id"]
     assert str(uuid.UUID(job_id)) == job_id
 
-    conn = mocked_deps["conn"]
-    cursor = conn._cursor
-    sql, params = cursor.execute_calls[0]
+    sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
     assert "VALUES (%s, %s, %s, %s, %s, 'queued')" in sql
     assert params == (job_id, "write hello world", None, VALID_REPO, None)
-    assert conn.commits == 1
+    mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
 
@@ -53,11 +51,10 @@ def test_create_job_with_issue_number(client, mocked_deps):
     job_id = body["job_id"]
     assert str(uuid.UUID(job_id)) == job_id
 
-    conn = mocked_deps["conn"]
-    sql, params = conn._cursor.execute_calls[0]
+    sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
     assert params == (job_id, None, 42, VALID_REPO, None)
-    assert conn.commits == 1
+    mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
 
@@ -72,10 +69,10 @@ def test_create_job_with_model(client, mocked_deps):
     assert body["status"] == "queued"
     job_id = body["job_id"]
 
-    sql, params = mocked_deps["conn"]._cursor.execute_calls[0]
+    sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
     assert params == (job_id, "write hello world", None, VALID_REPO, "deepseek/deepseek-v4-pro")
-    assert mocked_deps["conn"].commits == 1
+    mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
 
@@ -83,7 +80,7 @@ def test_create_job_rejects_missing_repo(client, mocked_deps):
     resp = client.post("/jobs", json={"prompt": "write hello world"})
 
     assert resp.status_code == 400
-    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["cursor"].execute.assert_not_called()
     mocked_deps["enqueue_job"].assert_not_called()
 
 
@@ -91,7 +88,7 @@ def test_create_job_rejects_invalid_repo(client, mocked_deps):
     resp = client.post("/jobs", json={"prompt": "write hello world", "repo": "not-a-repo"})
 
     assert resp.status_code == 400
-    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["cursor"].execute.assert_not_called()
     mocked_deps["enqueue_job"].assert_not_called()
 
 
@@ -103,7 +100,7 @@ def test_create_job_rejects_invalid_model(client, mocked_deps):
         )
 
         assert resp.status_code == 400
-        assert mocked_deps["conn"]._cursor.execute_calls == []
+        mocked_deps["cursor"].execute.assert_not_called()
         mocked_deps["enqueue_job"].assert_not_called()
 
 
@@ -111,7 +108,7 @@ def test_create_job_rejects_missing_prompt_and_issue(client, mocked_deps):
     resp = client.post("/jobs", json={"repo": VALID_REPO})
 
     assert resp.status_code == 400
-    assert mocked_deps["conn"]._cursor.execute_calls == []
+    mocked_deps["cursor"].execute.assert_not_called()
     mocked_deps["enqueue_job"].assert_not_called()
 
 
@@ -131,8 +128,7 @@ def test_create_job_rejects_non_positive_issue_number(client, mocked_deps):
 
 
 def test_get_job_returns_row(client, mocked_deps):
-    conn = mocked_deps["conn"]
-    conn._cursor.fetchone_result = (
+    mocked_deps["cursor"].fetchone.return_value = (
         "abc-123",
         "write hello world",
         "queued",
@@ -158,7 +154,7 @@ def test_get_job_returns_row(client, mocked_deps):
         "repo": VALID_REPO,
         "model": "deepseek/deepseek-v4-pro",
     }
-    sql, params = conn._cursor.execute_calls[0]
+    sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "SELECT" in sql
     assert "FROM jobs" in sql
     assert "WHERE id = %s" in sql
@@ -170,5 +166,5 @@ def test_get_job_returns_error_when_missing(client, mocked_deps):
 
     assert resp.status_code == 200
     assert resp.json() == {"error": "not found"}
-    sql, params = mocked_deps["conn"]._cursor.execute_calls[0]
+    sql, params = mocked_deps["cursor"].execute.call_args.args
     assert params == ("missing",)

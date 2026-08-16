@@ -4,3 +4,4 @@ psycopg2-binary
 redis
 pydantic
 httpx2
+pytest-mock

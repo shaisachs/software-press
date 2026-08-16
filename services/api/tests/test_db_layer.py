@@ -1,16 +1,14 @@
 import psycopg2
-from unittest import mock
 
 from app import db_layer
 
 
-def test_get_conn_uses_defaults(monkeypatch):
+def test_get_conn_uses_defaults(monkeypatch, mocker):
     monkeypatch.delenv("POSTGRES_HOST", raising=False)
     monkeypatch.delenv("POSTGRES_DB", raising=False)
     monkeypatch.delenv("POSTGRES_USER", raising=False)
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
-    fake_connect = mock.Mock()
-    monkeypatch.setattr(psycopg2, "connect", fake_connect)
+    fake_connect = mocker.patch.object(psycopg2, "connect")
 
     db_layer.get_conn()
 
@@ -22,13 +20,12 @@ def test_get_conn_uses_defaults(monkeypatch):
     )
 
 
-def test_get_conn_uses_env_vars(monkeypatch):
+def test_get_conn_uses_env_vars(monkeypatch, mocker):
     monkeypatch.setenv("POSTGRES_HOST", "dbhost")
     monkeypatch.setenv("POSTGRES_DB", "mydb")
     monkeypatch.setenv("POSTGRES_USER", "myuser")
     monkeypatch.setenv("POSTGRES_PASSWORD", "mypass")
-    fake_connect = mock.Mock()
-    monkeypatch.setattr(psycopg2, "connect", fake_connect)
+    fake_connect = mocker.patch.object(psycopg2, "connect")
 
     db_layer.get_conn()
 
