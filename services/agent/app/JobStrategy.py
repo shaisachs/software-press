@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 class JobStrategy:
     def __init__(self, job_item):
         self.job_item = job_item
+        self.git = job_item.git
 
     def setup_item_run(self):
         pass
@@ -18,8 +19,18 @@ class JobStrategy:
     def close_item_run(self, output: Optional[str] = None):
         pass
 
+    def checkout_workspace_branch(self):
+        branch = self.git.resolve_branch(self.job_item.job.branch)
+        self.git.checkout_branch(branch)
+
+    def reset_workspace(self):
+        self.checkout_workspace_branch()
+
 
 class AdHocPromptStrategy(JobStrategy):
+    def setup_item_run(self):
+        self.checkout_workspace_branch()
+
     def build_prompt(self) -> str:
         return self.job_item.job.prompt
 
@@ -32,7 +43,7 @@ class IssueResolveStrategy(JobStrategy):
         self.db = db if db is not None else job_item.db
         self.issue = None
         self.branch = None
-        self.default_branch = None
+        self.base_branch = None
 
     @property
     def _job(self):
@@ -47,8 +58,8 @@ class IssueResolveStrategy(JobStrategy):
     def fetch_issue(self, issue_number: int) -> dict:
         return self.gh.fetch_issue(issue_number)
 
-    def create_branch(self, branch: str) -> Tuple[str, str]:
-        return self.git.create_branch(branch)
+    def create_branch(self, branch: str, base: str) -> Tuple[str, str]:
+        return self.git.create_branch(branch, base)
 
     def push_to_origin(self, branch: str):
         self.git.push_to_origin(branch)
@@ -59,18 +70,19 @@ class IssueResolveStrategy(JobStrategy):
     def create_pull_request(
         self,
         branch: str,
-        default_branch: str,
+        base_branch: str,
         title: str,
         issue_number: Optional[int],
     ) -> Optional[int]:
-        return self.gh.create_pull_request(branch, default_branch, title, issue_number)
+        return self.gh.create_pull_request(branch, base_branch, title, issue_number)
 
     def record_pr_number(self, pr_number: int):
         self.db.record_pr_number(self._job.job_id, pr_number)
 
     def setup_item_run(self):
+        base = self.git.resolve_branch(self._job.branch)
         branch = self.branch_name_for_issue(self._issue["title"])
-        (self.default_branch, self.branch) = self.create_branch(branch)
+        (self.base_branch, self.branch) = self.create_branch(branch, base)
 
     def build_prompt(self) -> str:
         return (
@@ -86,12 +98,10 @@ class IssueResolveStrategy(JobStrategy):
 
         title = self._issue["title"]
         pr_number = self.create_pull_request(
-            self.branch, self.default_branch, title, self._job.issue_number
+            self.branch, self.base_branch, title, self._job.issue_number
         )
         if pr_number is not None:
             self.record_pr_number(pr_number)
-
-        self.checkout_branch(self.default_branch)
 
     @staticmethod
     def _format_issue_text(issue: dict) -> str:
@@ -139,6 +149,9 @@ class IssueArchitectStrategy(JobStrategy):
         if self.issue is None:
             self.issue = self.gh.fetch_issue(self._job.issue_number)
         return self.issue
+
+    def setup_item_run(self):
+        self.checkout_workspace_branch()
 
     def commits_changes(self) -> bool:
         return False

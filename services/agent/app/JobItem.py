@@ -76,6 +76,8 @@ class JobItem:
         else:
             self.strategy.close_item_run(output)
 
+        self.strategy.reset_workspace()
+
     @staticmethod
     def _workspace_dir(repo: str) -> Path:
         return config.WORKSPACES_ROOT / repo

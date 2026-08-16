@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 from app.command_runner import CommandRunner
 
@@ -16,12 +16,18 @@ class GitClient:
             return result.stdout.strip().split("/")[-1]
         return "main"
 
-    def create_branch(self, branch: str) -> Tuple[str, str]:
-        default_branch = self.get_default_branch()
-        self.command_runner.run(
-            ["git", "checkout", "-B", branch, f"origin/{default_branch}"]
+    def resolve_branch(self, requested: Optional[str]) -> str:
+        if requested:
+            return requested
+        return self.get_default_branch()
+
+    def create_branch(self, branch: str, base: str) -> Tuple[str, str]:
+        result = self.command_runner.run(
+            ["git", "checkout", "-B", branch, f"origin/{base}"]
         )
-        return (default_branch, branch)
+        if result.returncode != 0:
+            raise Exception(f"failed to create branch {branch} from origin/{base}")
+        return (base, branch)
 
     def try_stage_changes(self) -> bool:
         self.command_runner.run(["git", "add", "-A"])
@@ -37,5 +43,7 @@ class GitClient:
         )
 
     def checkout_branch(self, branch: str):
-        self.command_runner.run(["git", "checkout", branch ])
+        result = self.command_runner.run(["git", "checkout", branch])
+        if result.returncode != 0:
+            raise Exception(f"failed to checkout branch: {branch}")
 
