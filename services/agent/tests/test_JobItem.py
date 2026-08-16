@@ -3,7 +3,7 @@ import pytest
 from app import config
 from app.models import Job
 from app.JobItem import JobItem
-from app.JobStrategy import AdHocPromptStrategy, IssueResolveStrategy
+from app.JobStrategy import AdHocPromptStrategy, IssueArchitectStrategy, IssueResolveStrategy
 
 from tests.conftest import (
     VALID_REPO,
@@ -11,12 +11,13 @@ from tests.conftest import (
     make_db,
     make_gh,
     make_git,
+    make_result,
     use_workspaces,
 )
 
 
 def make_job(**overrides):
-    defaults = dict(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    defaults = dict(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     defaults.update(overrides)
     return Job(**defaults)
 
@@ -119,7 +120,7 @@ def test_init_constructs_default_dependencies(mocker, tmp_path, monkeypatch):
 def test_init_does_not_fetch_issue_when_prompt_present(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     gh = make_gh(mocker)
-    job = make_job(prompt="already set", issue_number=42)
+    job = make_job(prompt="already set", issue_number=None)
 
     job_item = make_job_item(mocker, job, gh=gh)
 
@@ -162,29 +163,46 @@ def test_init_accepts_available_model(mocker, tmp_path, monkeypatch):
     assert job_item.model == "deepseek/deepseek-v4-pro"
 
 
-def test_init_selects_adhoc_prompt_strategy_when_prompt_present(mocker, tmp_path, monkeypatch):
+def test_init_selects_adhoc_prompt_strategy_when_type_adhoc(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt="write hello world", issue_number=42)
+    job = make_job(prompt="write hello world", issue_number=None, type="adHoc")
 
     job_item = make_job_item(mocker, job)
 
     assert isinstance(job_item.strategy, AdHocPromptStrategy)
 
 
-def test_init_selects_issue_resolve_strategy_when_prompt_missing(mocker, tmp_path, monkeypatch):
+def test_init_selects_issue_resolve_strategy_when_type_issue_resolver(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt=None, issue_number=42)
+    job = make_job(prompt=None, issue_number=42, type="issueResolver")
 
     job_item = make_job_item(mocker, job)
 
     assert isinstance(job_item.strategy, IssueResolveStrategy)
 
 
-def test_init_raises_when_no_prompt_or_issue_number(mocker, tmp_path, monkeypatch):
+def test_init_selects_issue_architect_strategy_when_type_issue_architect(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt=None, issue_number=None)
+    job = make_job(prompt=None, issue_number=42, type="issueArchitect")
 
-    with pytest.raises(Exception, match="prompt or an issue number"):
+    job_item = make_job_item(mocker, job)
+
+    assert isinstance(job_item.strategy, IssueArchitectStrategy)
+
+
+def test_init_raises_when_unknown_type(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(type="bogus")
+
+    with pytest.raises(Exception, match="unknown job type: bogus"):
+        make_job_item(mocker, job)
+
+
+def test_init_raises_when_type_missing(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(type=None)
+
+    with pytest.raises(Exception, match="unknown job type: None"):
         make_job_item(mocker, job)
 
 
@@ -212,7 +230,7 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     repo_dir = use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
-    job = make_job(prompt=None, issue_number=42, artifact_path=artifact_path)
+    job = make_job(prompt=None, issue_number=42, artifact_path=artifact_path, type="issueResolver")
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
@@ -256,7 +274,7 @@ def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch)
 
 def test_run_skips_commit_and_pr_when_no_changes(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt=None, issue_number=42)
+    job = make_job(prompt=None, issue_number=42, type="issueResolver")
     gh = make_gh(mocker)
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
@@ -282,3 +300,42 @@ def test_run_uses_selected_model(mocker, tmp_path, monkeypatch):
     opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
     assert len(opencode_calls) == 1
     assert opencode_calls[0][4] == "deepseek/deepseek-v4-pro"
+
+
+def test_run_with_issue_architect_posts_comment_and_commits_nothing(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42, type="issueArchitect")
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    db = make_db(mocker)
+    command_runner = make_command_runner(mocker)
+    command_runner.run.return_value = make_result(mocker, stdout="Proposed approach: use a state machine.")
+    job_item = make_job_item(mocker, job, gh=gh, git=git, command_runner=command_runner, db=db)
+
+    job_item.run()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    gh.create_issue_comment.assert_called_once_with(42, "Proposed approach: use a state machine.")
+    git.try_stage_changes.assert_not_called()
+    git.commit_changes.assert_not_called()
+    git.create_branch.assert_not_called()
+    git.push_to_origin.assert_not_called()
+    gh.create_pull_request.assert_not_called()
+    db.record_pr_number.assert_not_called()
+
+
+def test_run_with_issue_architect_skips_comment_when_no_output(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42, type="issueArchitect")
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    command_runner = make_command_runner(mocker)
+    command_runner.run.return_value = make_result(mocker, stdout="")
+    job_item = make_job_item(mocker, job, gh=gh, git=git, command_runner=command_runner)
+
+    job_item.run()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    gh.create_issue_comment.assert_not_called()
+    git.try_stage_changes.assert_not_called()
+    git.commit_changes.assert_not_called()

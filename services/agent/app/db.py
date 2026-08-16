@@ -28,13 +28,20 @@ class Db:
         cur = conn.cursor()
         try:
             cur.execute(
-                "SELECT prompt, issue_number, repo, model FROM jobs WHERE id = %s",
+                "SELECT prompt, issue_number, repo, model, type FROM jobs WHERE id = %s",
                 (job_id,),
             )
             row = cur.fetchone()
             if row is None:
                 return None
-            return Job(job_id=job_id, prompt=row[0], issue_number=row[1], repo=row[2], model=row[3])
+            return Job(
+                job_id=job_id,
+                prompt=row[0],
+                issue_number=row[1],
+                repo=row[2],
+                model=row[3],
+                type=row[4],
+            )
         except Exception as e:
             print("Error fetching job! " + str(e))
             conn.rollback()

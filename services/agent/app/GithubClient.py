@@ -45,6 +45,19 @@ class GithubClient:
 
         return json.loads(result.stdout)
 
+    def create_issue_comment(self, issue_number: int, body: str):
+        self._ensure_gh_auth()
+
+        result = self.command_runner.run(
+            ["gh", "issue", "comment", str(issue_number), "--body", body]
+        )
+
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or "unknown gh error"
+            raise Exception(f"gh issue comment failed: {detail}")
+
+        return result.stdout
+
     def create_pull_request(
         self,
         branch: str,

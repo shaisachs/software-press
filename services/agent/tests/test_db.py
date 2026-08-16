@@ -14,7 +14,7 @@ def make_db(mocker, fetchone_result=None):
 def test_fetch_job_builds_job(mocker):
     db, cursor, conn = make_db(
         mocker,
-        fetchone_result=("hello", 42, "shaisachs/laws-of-software", "deepseek/deepseek-v4-flash"),
+        fetchone_result=("hello", 42, "shaisachs/laws-of-software", "deepseek/deepseek-v4-flash", "issueResolver"),
     )
 
     job = db.fetch_job("abc-123")
@@ -25,6 +25,7 @@ def test_fetch_job_builds_job(mocker):
     assert job.issue_number == 42
     assert job.repo == "shaisachs/laws-of-software"
     assert job.model == "deepseek/deepseek-v4-flash"
+    assert job.type == "issueResolver"
     assert not conn.closed
     cursor.close.assert_called_once_with()
     sql, params = cursor.execute.call_args.args

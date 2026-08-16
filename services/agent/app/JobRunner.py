@@ -55,7 +55,8 @@ class JobRunner:
         artifact_path = self._make_artifact_path(job_item.job.job_id)
         artifact_path.mkdir(parents=True, exist_ok=True)
 
-        (artifact_path / "prompt.txt").write_text(job_item.job.prompt)
+        if job_item.job.prompt is not None:
+            (artifact_path / "prompt.txt").write_text(job_item.job.prompt)
 
         try:
             with open(artifact_path / "output.txt", "w", encoding="utf-8") as output_file:

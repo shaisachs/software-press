@@ -5,7 +5,12 @@ from app.command_runner import CommandRunner
 from app.db import Db
 from app.GithubClient import GithubClient
 from app.GitClient import GitClient
-from app.JobStrategy import AdHocPromptStrategy, IssueResolveStrategy, JobStrategy
+from app.JobStrategy import (
+    AdHocPromptStrategy,
+    IssueArchitectStrategy,
+    IssueResolveStrategy,
+    JobStrategy,
+)
 from app.models import Job
 
 class JobItem:
@@ -29,11 +34,13 @@ class JobItem:
         return self.job.model or config.opencode_model()
 
     def _build_strategy(self) -> JobStrategy:
-        if self.job.prompt is not None:
+        if self.job.type == "adHoc":
             return AdHocPromptStrategy(self)
-        if self.job.issue_number is not None:
+        if self.job.type == "issueResolver":
             return IssueResolveStrategy(self, gh=self.gh, git=self.git, db=self.db)
-        raise Exception("job must have a prompt or an issue number")
+        if self.job.type == "issueArchitect":
+            return IssueArchitectStrategy(self, gh=self.gh, git=self.git, db=self.db)
+        raise Exception(f"unknown job type: {self.job.type}")
 
     def try_stage_changes(self) -> bool:
         return self.git.try_stage_changes()
@@ -42,7 +49,7 @@ class JobItem:
         self.git.commit_changes()
 
     def run_prompt(self, prompt: str):
-        self.command_runner.run(
+        result = self.command_runner.run(
             [
                 "opencode",
                 "--dir", self.command_runner.working_dir,
@@ -52,18 +59,22 @@ class JobItem:
                 prompt,
             ]
         )
+        return result.stdout if result is not None else None
 
     def run(self):
         self.strategy.setup_item_run()
         prompt = self.strategy.build_prompt()
-        self.run_prompt(prompt)
+        output = self.run_prompt(prompt)
 
-        if self.try_stage_changes():
-            self.commit_changes()
-            self.strategy.close_item_run()
+        if self.strategy.commits_changes():
+            if self.try_stage_changes():
+                self.commit_changes()
+                self.strategy.close_item_run(output)
+            else:
+                # TODO: proper logging framework, this access pattern kind of sucks
+                self.command_runner.output_file.write("No changes staged; skipping commit and pull request.\n")
         else:
-            # TODO: proper logging framework, this access pattern kind of sucks
-            self.command_runner.output_file.write("No changes staged; skipping commit and pull request.\n")
+            self.strategy.close_item_run(output)
 
     @staticmethod
     def _workspace_dir(repo: str) -> Path:
