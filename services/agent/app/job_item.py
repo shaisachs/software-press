@@ -11,7 +11,7 @@ from app.GithubClient import GithubClient
 from app.GitClient import GitClient
 from app.models import Job
 
-class WorkItem:
+class JobItem:
     def __init__(self, job: Job, gh=None, git=None, command_runner=None, db=None):
         self.job = job
 

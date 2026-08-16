@@ -3,14 +3,14 @@ from typing import Optional
 
 from app.db import Db
 from app.queue_redis import Queue
-from app.work_item import WorkItem
+from app.job_item import JobItem
 
 
 class JobRunner:
-    def __init__(self, queue: Queue, db: Db, work_item_factory=WorkItem):
+    def __init__(self, queue: Queue, db: Db, job_item_factory=JobItem):
         self.queue = queue
         self._db = db
-        self._work_item_factory = work_item_factory
+        self._job_item_factory = job_item_factory
         self._busy = False
 
     @property
@@ -21,7 +21,7 @@ class JobRunner:
     def build(cls):
         return cls(queue=Queue(), db=Db())
 
-    def dequeue_job(self) -> Optional[WorkItem]:
+    def dequeue_job(self) -> Optional[JobItem]:
         if self._busy:
             return None
 
@@ -34,28 +34,28 @@ class JobRunner:
             return None
 
         try:
-            work_item = self._work_item_factory(job, db=self._db)
+            job_item = self._job_item_factory(job, db=self._db)
             self._db.mark_running(job)
         except Exception as e:
             self.complete_job(job_id, 'failed', f"Error dequeueing job! {e}")
             return None
 
         self._busy = True
-        return work_item
+        return job_item
 
-    def run_job(self, work_item: WorkItem):
-        artifact_path = work_item.job.artifact_path
-        (artifact_path / "prompt.txt").write_text(work_item.job.prompt)
+    def run_job(self, job_item: JobItem):
+        artifact_path = job_item.job.artifact_path
+        (artifact_path / "prompt.txt").write_text(job_item.job.prompt)
 
         try:
             with open(artifact_path / "output.txt", "w", encoding="utf-8") as output_file:
-                work_item.command_runner.output_file = output_file
+                job_item.command_runner.output_file = output_file
                 try:
-                    work_item.run()
+                    job_item.run()
                 finally:
-                    work_item.command_runner.output_file = None
+                    job_item.command_runner.output_file = None
         except Exception as e:
-            self.complete_job(work_item.job.job_id, 'failed', f"Error running job! {e}")
+            self.complete_job(job_item.job.job_id, 'failed', f"Error running job! {e}")
 
     def complete_job(self, job_id: str, status: str, error_desc: str):
         self._db.complete_job(job_id, status, error_desc)
@@ -66,11 +66,11 @@ def main():
     runner = JobRunner.build()
 
     while True:
-        work_item = runner.dequeue_job()
+        job_item = runner.dequeue_job()
 
-        if work_item:
-            runner.run_job(work_item)
-            runner.complete_job(work_item.job.job_id, 'completed', None)
+        if job_item:
+            runner.run_job(job_item)
+            runner.complete_job(job_item.job.job_id, 'completed', None)
 
         time.sleep(2)
 

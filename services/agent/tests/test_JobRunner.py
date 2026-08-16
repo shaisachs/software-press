@@ -3,7 +3,7 @@ from unittest import mock
 from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
-from app.work_item import WorkItem
+from app.job_item import JobItem
 
 from tests.conftest import (
     VALID_REPO,
@@ -16,8 +16,8 @@ from tests.conftest import (
 )
 
 
-def make_work_item(mocker, job, gh=None, git=None, command_runner=None, db=None):
-    return WorkItem(
+def make_job_item(mocker, job, gh=None, git=None, command_runner=None, db=None):
+    return JobItem(
         job=job,
         gh=gh if gh is not None else make_gh(mocker),
         git=git if git is not None else make_git(mocker),
@@ -34,9 +34,9 @@ def make_runner(mocker, tmp_path, job=None, queue_job_id="abc-123"):
     command_runner = make_command_runner(mocker)
 
     def factory(job, db=None):
-        return WorkItem(job=job, gh=gh, git=git, command_runner=command_runner, db=db)
+        return JobItem(job=job, gh=gh, git=git, command_runner=command_runner, db=db)
 
-    runner = JobRunner(queue=queue, db=db, work_item_factory=factory)
+    runner = JobRunner(queue=queue, db=db, job_item_factory=factory)
     return runner, db, gh, git, command_runner
 
 
@@ -84,9 +84,9 @@ def test_dequeue_job_uses_stored_prompt(mocker, tmp_path, monkeypatch):
     job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
-    work_item = runner.dequeue_job()
+    job_item = runner.dequeue_job()
 
-    assert work_item.job is job
+    assert job_item.job is job
     assert job.prompt == "write hello world"
     gh.fetch_issue.assert_not_called()
     db.mark_running.assert_called_once_with(job)
@@ -99,9 +99,9 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(mocker, tmp_path, mo
     job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
-    work_item = runner.dequeue_job()
+    job_item = runner.dequeue_job()
 
-    assert work_item.job is job
+    assert job_item.job is job
     gh.fetch_issue.assert_called_once_with(42)
     assert "# GitHub Issue #42" in job.prompt
     assert "Title: Fix the bug" in job.prompt
@@ -118,7 +118,7 @@ def test_dequeue_job_marks_failed_on_error(mocker, tmp_path, monkeypatch):
     gh.fetch_issue.side_effect = Exception("gh is down")
 
     def factory(job, db=None):
-        return WorkItem(
+        return JobItem(
             job=job,
             gh=gh,
             git=make_git(mocker),
@@ -126,7 +126,7 @@ def test_dequeue_job_marks_failed_on_error(mocker, tmp_path, monkeypatch):
             db=db,
         )
 
-    runner = JobRunner(queue=queue, db=db, work_item_factory=factory)
+    runner = JobRunner(queue=queue, db=db, job_item_factory=factory)
 
     assert runner.dequeue_job() is None
     assert not runner.busy
@@ -175,9 +175,9 @@ def test_dequeue_job_accepts_available_model(mocker, tmp_path, monkeypatch):
 
     monkeypatch.setattr(config, "model_is_available", lambda model: True)
 
-    work_item = runner.dequeue_job()
+    job_item = runner.dequeue_job()
 
-    assert work_item.job is job
+    assert job_item.job is job
     db.mark_running.assert_called_once_with(job)
 
 
@@ -190,20 +190,20 @@ def test_complete_job_delegates_to_db(mocker, tmp_path):
     assert not runner.busy
 
 
-def test_run_job_delegates_to_work_item(mocker, tmp_path):
+def test_run_job_delegates_to_job_item(mocker, tmp_path):
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
-    work_item = mocker.Mock()
-    work_item.job = Job(
+    job_item = mocker.Mock()
+    job_item.job = Job(
         job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
     )
-    work_item.command_runner = mocker.Mock()
+    job_item.command_runner = mocker.Mock()
 
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
 
-    result = runner.run_job(work_item)
+    result = runner.run_job(job_item)
 
-    work_item.run.assert_called_once_with()
+    job_item.run.assert_called_once_with()
     assert result is None
 
 
@@ -215,10 +215,10 @@ def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatc
         job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
     )
     command_runner = make_command_runner(mocker)
-    work_item = make_work_item(mocker, job, command_runner=command_runner)
+    job_item = make_job_item(mocker, job, command_runner=command_runner)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
-    pr_number = runner.run_job(work_item)
+    pr_number = runner.run_job(job_item)
 
     assert pr_number is None
     assert (artifact_path / "prompt.txt").read_text() == "write hello world"
@@ -237,14 +237,14 @@ def test_run_job_emits_command_output_to_output_file(mocker, tmp_path, monkeypat
     command_runner.run.side_effect = lambda cmd, input=None: seen_output_files.append(
         command_runner.output_file
     )
-    work_item = make_work_item(mocker, job, command_runner=command_runner)
+    job_item = make_job_item(mocker, job, command_runner=command_runner)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
-    runner.run_job(work_item)
+    runner.run_job(job_item)
 
     assert seen_output_files
     assert all(output_file is not None for output_file in seen_output_files)
-    assert work_item.command_runner.output_file is None
+    assert job_item.command_runner.output_file is None
 
 
 def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
@@ -256,10 +256,10 @@ def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
     )
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
-    work_item = make_work_item(mocker, job, git=git)
+    job_item = make_job_item(mocker, job, git=git)
 
     runner, db, gh, _, _ = make_runner(mocker, tmp_path, job=job)
-    runner.run_job(work_item)
+    runner.run_job(job_item)
 
     assert "No changes staged" in (artifact_path / "output.txt").read_text()
 
@@ -271,29 +271,29 @@ def test_run_job_skips_no_changes_message_when_changes_staged(mocker, tmp_path, 
     job = Job(
         job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
     )
-    work_item = make_work_item(mocker, job)
+    job_item = make_job_item(mocker, job)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
-    runner.run_job(work_item)
+    runner.run_job(job_item)
 
     assert "No changes staged" not in (artifact_path / "output.txt").read_text()
 
 
-def test_run_job_returns_none_when_work_item_raises(mocker, tmp_path, monkeypatch):
+def test_run_job_returns_none_when_job_item_raises(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
     job = Job(
         job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
     )
-    work_item = mocker.Mock()
-    work_item.job = job
-    work_item.command_runner = mocker.Mock()
-    work_item.run.side_effect = Exception("boom")
+    job_item = mocker.Mock()
+    job_item.job = job
+    job_item.command_runner = mocker.Mock()
+    job_item.run.side_effect = Exception("boom")
 
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
-    result = runner.run_job(work_item)
+    result = runner.run_job(job_item)
 
     assert result is None
     db.complete_job.assert_called_once_with("abc-123", "failed", "Error running job! boom")
