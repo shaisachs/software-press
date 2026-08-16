@@ -8,15 +8,16 @@ class JobStrategy:
     def setup_item_run(self):
         pass
 
-    def build_prompt(self):
-        pass
+    def build_prompt(self) -> str:
+        return None
 
     def close_item_run(self):
         pass
 
 
 class AdHocPromptStrategy(JobStrategy):
-    pass
+    def build_prompt(self) -> str:
+        return self._job_item.job.prompt    
 
 
 class IssueResolveStrategy(JobStrategy):
@@ -40,11 +41,14 @@ class IssueResolveStrategy(JobStrategy):
         branch = self.branch_name_for_issue(self._issue["title"])
         (self.default_branch, self.branch) = self.job_item.create_branch(branch)
 
-    def build_prompt(self):
-        if self._job.prompt is None:
-            self._job.prompt = self._build_prompt(
-                self._job.issue_number, self._format_issue_text(self._issue)
-            )
+    def build_prompt(self) -> str:
+        return (
+            "A GitHub issue has been filed against this repository - the body and comments are below. "
+            "Please resolve it by making the necessary changes to the code. "
+            "The changes will be committed and a pull request will be created for them.\n\n"
+            f"# GitHub Issue #{self._job.issue_number}\n\n"
+            f"{self._format_issue_text(self._issue)}"
+        )
 
     def close_item_run(self):
         self.job_item.push_to_origin(self.branch)

@@ -24,7 +24,6 @@ class JobItem:
         self.db = db or Db()
 
         self.strategy = self._build_strategy()
-        self.strategy.build_prompt()
 
     @property
     def model(self) -> str:
@@ -67,7 +66,7 @@ class JobItem:
     def record_pr_number(self, pr_number: int):
         self.db.record_pr_number(self.job.job_id, pr_number)
 
-    def run_prompt(self):
+    def run_prompt(self, prompt: str):
         self.command_runner.run(
             [
                 "opencode",
@@ -75,13 +74,14 @@ class JobItem:
                 "--model", self.model,
                 "run",
                 "--agent", "build",
-                self.job.prompt,
+                prompt,
             ]
         )
 
     def run(self):
         self.strategy.setup_item_run()
-        self.run_prompt()
+        prompt = self.strategy.build_prompt()
+        self.run_prompt(prompt)
 
         if self.try_stage_changes():
             self.commit_changes()
