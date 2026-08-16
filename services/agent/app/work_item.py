@@ -11,13 +11,6 @@ from app.GithubClient import GithubClient
 from app.GitClient import GitClient
 from app.models import Job
 
-
-@dataclass
-class RunResult:
-    pr_number: Optional[int] = None
-    changes_staged: bool = False
-
-
 class WorkItem:
     def __init__(self, job: Job, gh=None, git=None, command_runner=None, db=None):
         self.job = job
@@ -86,11 +79,10 @@ class WorkItem:
             ]
         )
 
-    def run(self) -> "RunResult":
+    def run(self):
         issue = None
         default_branch = None
         pr_number = None
-        changes_staged = False
 
         if self.job.issue_number is not None:
             issue = self.fetch_issue(self.job.issue_number)
@@ -100,7 +92,6 @@ class WorkItem:
         self.run_prompt()
 
         if self.try_stage_changes():
-            changes_staged = True
             self.commit_changes()
 
             if self.job.issue_number is not None:
@@ -110,11 +101,12 @@ class WorkItem:
                 pr_number = self.create_pull_request(branch, default_branch, title, self.job.issue_number)
                 if pr_number is not None:
                     self.record_pr_number(pr_number)
+        else:
+            # TODO: proper logging framework, this access pattern kind of sucks
+            self.command_runner.output_file.write("No changes staged; skipping commit and pull request.\n")
 
         if default_branch is not None:
             self.checkout_branch(default_branch)
-
-        return RunResult(pr_number=pr_number, changes_staged=changes_staged)
 
     @staticmethod
     def _workspace_dir(repo: str) -> Path:

@@ -37,13 +37,13 @@ class JobRunner:
             work_item = self._work_item_factory(job, db=self._db)
             self._db.mark_running(job)
         except Exception as e:
-            self.complete_job(job_id, 'failed', str(e))
+            self.complete_job(job_id, 'failed', f"Error dequeueing job! {e}")
             return None
 
         self._busy = True
         return work_item
 
-    def run_job(self, work_item: WorkItem) -> Optional[int]:
+    def run_job(self, work_item: WorkItem):
         artifact_path = work_item.job.artifact_path
         (artifact_path / "prompt.txt").write_text(work_item.job.prompt)
 
@@ -51,17 +51,11 @@ class JobRunner:
             with open(artifact_path / "output.txt", "w", encoding="utf-8") as output_file:
                 work_item.command_runner.output_file = output_file
                 try:
-                    result = work_item.run()
+                    work_item.run()
                 finally:
                     work_item.command_runner.output_file = None
-
-                if not result.changes_staged:
-                    output_file.write("No changes staged; skipping commit and pull request.\n")
-
-                return result.pr_number
         except Exception as e:
-            print("Error running job! " + str(e))
-            return None
+            self.complete_job(work_item.job.job_id, 'failed', f"Error running job! {e}")
 
     def complete_job(self, job_id: str, status: str, error_desc: str):
         self._db.complete_job(job_id, status, error_desc)
