@@ -80,7 +80,6 @@ class WorkItem:
         )
 
     def run(self) -> Optional[int]:
-        pr_number = None
         try:
             artifact_path = self.job.artifact_path
             (artifact_path / "prompt.txt").write_text(self.job.prompt)
@@ -88,6 +87,7 @@ class WorkItem:
             default_branch = None
             output_file_path = artifact_path / "output.txt"
             with open(output_file_path, "w", encoding="utf-8") as output_file:
+                pr_number = None
                 self.command_runner.output_file = output_file
 
                 if self.job.issue_number is not None:
@@ -105,6 +105,8 @@ class WorkItem:
 
                         title = f"Resolves #{self.job.issue_number}" if issue is None else issue["title"]
                         pr_number = self.create_pull_request(branch, default_branch, title, self.job.issue_number)
+                        if pr_number is not None:
+                            self.record_pr_number(pr_number)
                 else:
                     output_file.write("No changes staged; skipping commit and pull request.\n")
 
@@ -115,9 +117,6 @@ class WorkItem:
             return None
         finally:
             self.command_runner.output_file = None
-
-        if pr_number is not None:
-            self.record_pr_number(pr_number)
 
         return pr_number
 
