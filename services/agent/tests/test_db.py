@@ -64,6 +64,28 @@ def test_complete_job_updates_status(mocker):
     assert not conn.closed
 
 
+def test_record_pr_number_updates_job(mocker):
+    db, cursor, conn = make_db(mocker)
+
+    db.record_pr_number("abc-123", 99)
+
+    sql, params = cursor.execute.call_args.args
+    assert "UPDATE jobs" in sql
+    assert params == (99, "abc-123")
+    conn.commit.assert_called_once_with()
+    assert not conn.closed
+
+
+def test_record_pr_number_swallows_db_errors(mocker):
+    db, cursor, conn = make_db(mocker)
+    cursor.execute.side_effect = Exception("db is down")
+
+    db.record_pr_number("abc-123", 99)
+
+    conn.rollback.assert_called_once_with()
+    assert not conn.closed
+
+
 def test_complete_job_swallows_db_errors(mocker):
     db, cursor, conn = make_db(mocker)
     cursor.execute.side_effect = Exception("db is down")

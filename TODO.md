@@ -1,7 +1,8 @@
 - [x] allow the /jobs API to intake a provider and model so the defaults can be overridden
 - [x] mount deepseek api keys safely
 - [ ] ollama model init should be optional
-- [ ] runner - use strategy pattern so the issue-number stuff is tidied away
+- [x] runner - use strategy pattern so the issue-number stuff is tidied away
 - [ ] resiliency around failed commands and repo in a weird state, etc.
 - [x] automatically do all migrations that are not-done when postgres starts up
-- [x real mocking setup for unit tests
+- [x] real mocking setup for unit tests
+- [ ] recombine JobRunner and JobItem? JobItem is a pretty weird abstraction.
