@@ -11,8 +11,8 @@ test_in_docker() {
   local name="$1"
   local image="software-press-tests-$name"
 
-  echo "==> building test image ($name)"
-  docker build -t "$image" -f - "$ROOT/services/$name" <<'DOCKERFILE'
+  echo "==> $name: building test image"
+  docker build -q -t "$image" -f - "$ROOT/services/$name" <<'DOCKERFILE'
 FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt pytest
 COPY . .
 DOCKERFILE
 
-  echo "==> $name"
+  echo "==> $name: running tests"
   docker run --rm -w /app "$image" python3 -m pytest tests -q || status=1
 }
 
