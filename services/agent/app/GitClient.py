@@ -44,11 +44,6 @@ class GitClient:
 
     def checkout_branch(self, branch: str):
         result = self.command_runner.run(["git", "checkout", branch])
-        if result.returncode == 0:
-            return
-        result = self.command_runner.run(
-            ["git", "checkout", "-b", branch, f"origin/{branch}"]
-        )
         if result.returncode != 0:
             raise Exception(f"failed to checkout branch: {branch}")
 

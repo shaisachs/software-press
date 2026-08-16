@@ -113,21 +113,6 @@ def test_checkout_branch(recording_runner, mocker):
     recording_runner.run.assert_any_call(["git", "checkout", "feature/foo"])
 
 
-def test_checkout_branch_falls_back_to_origin(recording_runner, mocker):
-    recording_runner.on(
-        "checkout feature/foo",
-        make_result(mocker, returncode=1, stderr="error: pathspec 'feature/foo' did not match"),
-    )
-
-    git = make_git(recording_runner)
-    git.checkout_branch("feature/foo")
-
-    recording_runner.run.assert_any_call(["git", "checkout", "feature/foo"])
-    recording_runner.run.assert_any_call(
-        ["git", "checkout", "-b", "feature/foo", "origin/feature/foo"]
-    )
-
-
 def test_checkout_branch_raises_when_branch_unavailable(recording_runner, mocker):
     recording_runner.on(
         "checkout",
