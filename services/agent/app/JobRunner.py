@@ -1,9 +1,12 @@
 import time
 from typing import Optional
 
+from app import config
 from app.db import Db
 from app.queue_redis import Queue
 from app.JobItem import JobItem
+from datetime import datetime
+from pathlib import Path
 
 
 class JobRunner:
@@ -20,6 +23,11 @@ class JobRunner:
     @classmethod
     def build(cls):
         return cls(queue=Queue(), db=Db())
+
+    @staticmethod
+    def _make_artifact_path(job_id: str) -> Path:
+        now_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        return config.ARTIFACT_ROOT / f"{now_stamp}-{job_id}"
 
     def dequeue_job(self) -> Optional[JobItem]:
         if self._busy:
@@ -44,7 +52,9 @@ class JobRunner:
         return job_item
 
     def run_job(self, job_item: JobItem):
-        artifact_path = job_item.job.artifact_path
+        artifact_path = self._make_artifact_path(job_item.job.job_id)
+        artifact_path.mkdir(parents=True, exist_ok=True)
+
         (artifact_path / "prompt.txt").write_text(job_item.job.prompt)
 
         try:

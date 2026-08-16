@@ -69,15 +69,6 @@ def test_branch_name_for_issue():
     assert JobItem.branch_name_for_issue("Needs: Proper Casing!") == "feature/needs-proper-casing"
 
 
-def test_make_artifact_path(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "ARTIFACT_ROOT", tmp_path / "artifacts")
-
-    path = JobItem._make_artifact_path("abc-123")
-
-    assert str(path).startswith(str(tmp_path))
-    assert str(path).endswith("abc-123")
-
-
 def test_workspace_dir(tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
 

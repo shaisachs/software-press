@@ -297,3 +297,11 @@ def test_run_job_returns_none_when_job_item_raises(mocker, tmp_path, monkeypatch
 
     assert result is None
     db.complete_job.assert_called_once_with("abc-123", "failed", "Error running job! boom")
+
+def test_make_artifact_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "ARTIFACT_ROOT", tmp_path / "artifacts")
+
+    path = JobRunner._make_artifact_path("abc-123")
+
+    assert str(path).startswith(str(tmp_path))
+    assert str(path).endswith("abc-123")

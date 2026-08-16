@@ -1,6 +1,4 @@
 import re
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -24,10 +22,6 @@ class JobItem:
         self.gh = gh or GithubClient(self.command_runner)
         self.git = git or GitClient(self.command_runner)
         self.db = db or Db()
-
-        if job.artifact_path is None:
-            job.artifact_path = self._make_artifact_path(job.job_id)
-            job.artifact_path.mkdir(parents=True, exist_ok=True)
 
         if job.issue_number is not None and job.prompt is None:
             issue = self.fetch_issue(job.issue_number)
@@ -120,11 +114,6 @@ class JobItem:
         if not workspace_dir.is_dir():
             raise Exception(f"repo directory not found on disk: {workspace_dir}")
         return workspace_dir
-
-    @staticmethod
-    def _make_artifact_path(job_id: str) -> Path:
-        now_stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return config.ARTIFACT_ROOT / f"{now_stamp}-{job_id}"
 
     @staticmethod
     def _format_issue_text(issue: dict) -> str:
