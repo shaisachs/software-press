@@ -94,15 +94,14 @@ def test_model_uses_job_model(mocker, tmp_path, monkeypatch):
     assert job_item.model == "deepseek/deepseek-v4-pro"
 
 
-def test_init_sets_artifact_path_and_creates_dir(mocker, tmp_path, monkeypatch):
+def test_init_does_not_create_artifact_dir(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     job = make_job()
 
     job_item = make_job_item(mocker, job)
 
     assert job_item.job is job
-    assert job.artifact_path is not None
-    assert job.artifact_path.is_dir()
+    assert job.artifact_path is None
 
 
 def test_init_reuses_existing_artifact_path(mocker, tmp_path, monkeypatch):
@@ -280,7 +279,9 @@ def test_run_prompt_invokes_opencode(mocker, tmp_path, monkeypatch):
 
 def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monkeypatch):
     repo_dir = use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt="fix it", issue_number=42)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
@@ -299,8 +300,8 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     assert len(opencode_calls) == 1
     assert opencode_calls[0][2] == str(repo_dir)
     assert opencode_calls[0][4] == config.opencode_model()
-    assert not (job.artifact_path / "prompt.txt").exists()
-    assert not (job.artifact_path / "output.txt").exists()
+    assert not (artifact_path / "prompt.txt").exists()
+    assert not (artifact_path / "output.txt").exists()
 
 
 def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch):

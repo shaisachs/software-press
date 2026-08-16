@@ -90,8 +90,6 @@ def test_dequeue_job_uses_stored_prompt(mocker, tmp_path, monkeypatch):
     assert job.prompt == "write hello world"
     gh.fetch_issue.assert_not_called()
     db.mark_running.assert_called_once_with(job)
-    assert job.artifact_path is not None
-    assert job.artifact_path.is_dir()
 
 
 def test_dequeue_job_fetches_issue_text_when_prompt_missing(mocker, tmp_path, monkeypatch):
@@ -209,18 +207,14 @@ def test_run_job_delegates_to_job_item(mocker, tmp_path):
 
 def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
-    )
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
     command_runner = make_command_runner(mocker)
     job_item = make_job_item(mocker, job, command_runner=command_runner)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
-    pr_number = runner.run_job(job_item)
+    runner.run_job(job_item)
 
-    assert pr_number is None
+    artifact_path = next((tmp_path / "artifacts").glob("*-abc-123"))
     assert (artifact_path / "prompt.txt").read_text() == "write hello world"
     assert (artifact_path / "output.txt").exists()
 
@@ -249,11 +243,7 @@ def test_run_job_emits_command_output_to_output_file(mocker, tmp_path, monkeypat
 
 def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
-    )
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
     job_item = make_job_item(mocker, job, git=git)
@@ -261,21 +251,19 @@ def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
     runner, db, gh, _, _ = make_runner(mocker, tmp_path, job=job)
     runner.run_job(job_item)
 
+    artifact_path = next((tmp_path / "artifacts").glob("*-abc-123"))
     assert "No changes staged" in (artifact_path / "output.txt").read_text()
 
 
 def test_run_job_skips_no_changes_message_when_changes_staged(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
-    )
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
     job_item = make_job_item(mocker, job)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
     runner.run_job(job_item)
 
+    artifact_path = next((tmp_path / "artifacts").glob("*-abc-123"))
     assert "No changes staged" not in (artifact_path / "output.txt").read_text()
 
 
