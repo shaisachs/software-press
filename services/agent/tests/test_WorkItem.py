@@ -289,20 +289,17 @@ def test_run_prompt_invokes_opencode(mocker, tmp_path, monkeypatch):
 
 def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monkeypatch):
     repo_dir = use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
+    job = make_job(prompt="fix it", issue_number=42)
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
     command_runner = make_command_runner(mocker)
     work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner, db=db)
 
-    pr_number = work_item.run()
+    result = work_item.run()
 
-    assert pr_number == 99
-    assert (artifact_path / "prompt.txt").read_text() == "fix it"
-    assert (artifact_path / "output.txt").exists()
+    assert result.pr_number == 99
+    assert result.changes_staged
     gh.fetch_issue.assert_called_once_with(42)
     git.create_branch.assert_called_once_with("feature/fix-the-bug")
     git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
@@ -313,21 +310,22 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     assert len(opencode_calls) == 1
     assert opencode_calls[0][2] == str(repo_dir)
     assert opencode_calls[0][4] == config.opencode_model()
+    assert not (job.artifact_path / "prompt.txt").exists()
+    assert not (job.artifact_path / "output.txt").exists()
 
 
 def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = make_job(prompt="fix it", issue_number=None, artifact_path=artifact_path)
+    job = make_job(prompt="fix it", issue_number=None)
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
     work_item = make_work_item(mocker, job, gh=gh, git=git, db=db)
 
-    pr_number = work_item.run()
+    result = work_item.run()
 
-    assert pr_number is None
+    assert result.pr_number is None
+    assert result.changes_staged
     gh.fetch_issue.assert_not_called()
     git.create_branch.assert_not_called()
     git.push_to_origin.assert_not_called()
@@ -339,36 +337,33 @@ def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch)
 
 def test_run_skips_commit_and_pr_when_no_changes(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
+    job = make_job(prompt="fix it", issue_number=42)
     gh = make_gh(mocker)
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
     db = make_db(mocker)
     work_item = make_work_item(mocker, job, gh=gh, git=git, db=db)
 
-    pr_number = work_item.run()
+    result = work_item.run()
 
-    assert pr_number is None
+    assert result.pr_number is None
+    assert not result.changes_staged
     git.commit_changes.assert_not_called()
     gh.create_pull_request.assert_not_called()
     db.record_pr_number.assert_not_called()
-    assert "No changes staged" in (artifact_path / "output.txt").read_text()
 
 
 def test_run_uses_selected_model(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     monkeypatch.setattr(config, "model_is_available", lambda model: True)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = make_job(prompt="fix it", model="deepseek/deepseek-v4-pro", artifact_path=artifact_path)
+    job = make_job(prompt="fix it", model="deepseek/deepseek-v4-pro")
     command_runner = make_command_runner(mocker)
     work_item = make_work_item(mocker, job, command_runner=command_runner)
 
-    pr_number = work_item.run()
+    result = work_item.run()
 
-    assert pr_number is None
+    assert result.pr_number is None
+    assert result.changes_staged
     opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
     assert len(opencode_calls) == 1
     assert opencode_calls[0][4] == "deepseek/deepseek-v4-pro"

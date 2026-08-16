@@ -44,7 +44,24 @@ class JobRunner:
         return work_item
 
     def run_job(self, work_item: WorkItem) -> Optional[int]:
-        return work_item.run()
+        artifact_path = work_item.job.artifact_path
+        (artifact_path / "prompt.txt").write_text(work_item.job.prompt)
+
+        try:
+            with open(artifact_path / "output.txt", "w", encoding="utf-8") as output_file:
+                work_item.command_runner.output_file = output_file
+                try:
+                    result = work_item.run()
+                finally:
+                    work_item.command_runner.output_file = None
+
+                if not result.changes_staged:
+                    output_file.write("No changes staged; skipping commit and pull request.\n")
+
+                return result.pr_number
+        except Exception as e:
+            print("Error running job! " + str(e))
+            return None
 
     def complete_job(self, job_id: str, status: str, error_desc: str):
         self._db.complete_job(job_id, status, error_desc)

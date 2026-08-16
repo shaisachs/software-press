@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
@@ -9,6 +10,12 @@ from app.db import Db
 from app.GithubClient import GithubClient
 from app.GitClient import GitClient
 from app.models import Job
+
+
+@dataclass
+class RunResult:
+    pr_number: Optional[int] = None
+    changes_staged: bool = False
 
 
 class WorkItem:
@@ -79,46 +86,35 @@ class WorkItem:
             ]
         )
 
-    def run(self) -> Optional[int]:
-        try:
-            artifact_path = self.job.artifact_path
-            (artifact_path / "prompt.txt").write_text(self.job.prompt)
+    def run(self) -> "RunResult":
+        issue = None
+        default_branch = None
+        pr_number = None
+        changes_staged = False
 
-            default_branch = None
-            output_file_path = artifact_path / "output.txt"
-            with open(output_file_path, "w", encoding="utf-8") as output_file:
-                pr_number = None
-                self.command_runner.output_file = output_file
+        if self.job.issue_number is not None:
+            issue = self.fetch_issue(self.job.issue_number)
+            branch = self.branch_name_for_issue(issue["title"])
+            (default_branch, branch) = self.create_branch(branch)
 
-                if self.job.issue_number is not None:
-                    issue = self.fetch_issue(self.job.issue_number)
-                    branch = self.branch_name_for_issue(issue["title"])
-                    (default_branch, branch) = self.create_branch(branch)
+        self.run_prompt()
 
-                self.run_prompt()
+        if self.try_stage_changes():
+            changes_staged = True
+            self.commit_changes()
 
-                if self.try_stage_changes():
-                    self.commit_changes()
+            if self.job.issue_number is not None:
+                self.push_to_origin(branch)
 
-                    if self.job.issue_number is not None:
-                        self.push_to_origin(branch)
+                title = f"Resolves #{self.job.issue_number}" if issue is None else issue["title"]
+                pr_number = self.create_pull_request(branch, default_branch, title, self.job.issue_number)
+                if pr_number is not None:
+                    self.record_pr_number(pr_number)
 
-                        title = f"Resolves #{self.job.issue_number}" if issue is None else issue["title"]
-                        pr_number = self.create_pull_request(branch, default_branch, title, self.job.issue_number)
-                        if pr_number is not None:
-                            self.record_pr_number(pr_number)
-                else:
-                    output_file.write("No changes staged; skipping commit and pull request.\n")
+        if default_branch is not None:
+            self.checkout_branch(default_branch)
 
-                if default_branch is not None:
-                    self.checkout_branch(default_branch)
-        except Exception as e:
-            print("Error running job! " + str(e))
-            return None
-        finally:
-            self.command_runner.output_file = None
-
-        return pr_number
+        return RunResult(pr_number=pr_number, changes_staged=changes_staged)
 
     @staticmethod
     def _workspace_dir(repo: str) -> Path:

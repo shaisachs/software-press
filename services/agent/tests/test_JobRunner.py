@@ -3,7 +3,7 @@ from unittest import mock
 from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
-from app.work_item import WorkItem
+from app.work_item import RunResult, WorkItem
 
 from tests.conftest import (
     VALID_REPO,
@@ -191,11 +191,110 @@ def test_complete_job_delegates_to_db(mocker, tmp_path):
 
 
 def test_run_job_delegates_to_work_item(mocker, tmp_path):
-    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
     work_item = mocker.Mock()
-    work_item.run.return_value = 99
+    work_item.job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    work_item.command_runner = mocker.Mock()
+    work_item.run.return_value = RunResult(pr_number=99, changes_staged=True)
+
+    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
 
     pr_number = runner.run_job(work_item)
 
     work_item.run.assert_called_once_with()
     assert pr_number == 99
+
+
+def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    command_runner = make_command_runner(mocker)
+    work_item = make_work_item(mocker, job, command_runner=command_runner)
+
+    runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
+    pr_number = runner.run_job(work_item)
+
+    assert pr_number is None
+    assert (artifact_path / "prompt.txt").read_text() == "write hello world"
+    assert (artifact_path / "output.txt").exists()
+
+
+def test_run_job_emits_command_output_to_output_file(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    command_runner = make_command_runner(mocker)
+    seen_output_files = []
+    command_runner.run.side_effect = lambda cmd, input=None: seen_output_files.append(
+        command_runner.output_file
+    )
+    work_item = make_work_item(mocker, job, command_runner=command_runner)
+
+    runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
+    runner.run_job(work_item)
+
+    assert seen_output_files
+    assert all(output_file is not None for output_file in seen_output_files)
+    assert work_item.command_runner.output_file is None
+
+
+def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    git = make_git(mocker)
+    git.try_stage_changes.return_value = False
+    work_item = make_work_item(mocker, job, git=git)
+
+    runner, db, gh, _, _ = make_runner(mocker, tmp_path, job=job)
+    runner.run_job(work_item)
+
+    assert "No changes staged" in (artifact_path / "output.txt").read_text()
+
+
+def test_run_job_skips_no_changes_message_when_changes_staged(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    work_item = make_work_item(mocker, job)
+
+    runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
+    runner.run_job(work_item)
+
+    assert "No changes staged" not in (artifact_path / "output.txt").read_text()
+
+
+def test_run_job_returns_none_when_work_item_raises(mocker, tmp_path, monkeypatch, capsys):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = Job(
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+    )
+    work_item = mocker.Mock()
+    work_item.job = job
+    work_item.command_runner = mocker.Mock()
+    work_item.run.side_effect = Exception("boom")
+
+    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
+
+    pr_number = runner.run_job(work_item)
+
+    assert pr_number is None
+    assert "boom" in capsys.readouterr().out
