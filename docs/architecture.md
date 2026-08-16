@@ -71,7 +71,7 @@ A FastAPI service (port `8000`) that exposes:
 
 ### sp-agent (`services/agent`) - worker
 
-A Python process (`python -m app.runner`) that loops forever, blocking on the
+A Python process (`python -m app.JobRunner`) that loops forever, blocking on the
 Redis `jobs` queue. For each job it:
 
 1. Fetches the job from Postgres (`app/db.py`).

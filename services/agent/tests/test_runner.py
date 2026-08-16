@@ -2,7 +2,7 @@ from unittest import mock
 
 from app import config
 from app.models import Job
-from app.runner import JobRunner
+from app.JobRunner import JobRunner
 from app.work_item import WorkItem
 
 from tests.conftest import (

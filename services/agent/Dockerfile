@@ -51,4 +51,4 @@ ARG GIT_EMAIL
 
 RUN /bin/bash /app/bootstrap.sh "$GIT_NAME" "$GIT_EMAIL"
 
-CMD ["python3", "-m", "app.runner"]
+CMD ["python3", "-m", "app.JobRunner"]
