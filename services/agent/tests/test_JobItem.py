@@ -2,7 +2,7 @@ import pytest
 
 from app import config
 from app.models import Job
-from app.job_item import JobItem
+from app.JobItem import JobItem
 
 from tests.conftest import (
     VALID_REPO,

@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.db import Db
 from app.queue_redis import Queue
-from app.job_item import JobItem
+from app.JobItem import JobItem
 
 
 class JobRunner:

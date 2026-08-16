@@ -82,7 +82,7 @@ Redis `jobs` queue. For each job it:
 4. Creates an artifact directory under `ARTIFACT_ROOT` (e.g.
    `artifacts/20260811180005-<job_id>/`) and marks the job `running`.
 5. Runs `opencode run --agent build --model <model> "<prompt>"` in the repo's
-   working directory (`app/job_item.py:run_prompt`). Command output is streamed
+   working directory (`app/JobItem.py:run_prompt`). Command output is streamed
    to `output.txt`.
 6. Stages and commits any changes (`app/GitClient.py`). A `prepare-commit-msg`
    git hook invokes opencode again to auto-generate a Conventional Commits

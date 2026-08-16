@@ -3,7 +3,7 @@ from unittest import mock
 from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
-from app.job_item import JobItem
+from app.JobItem import JobItem
 
 from tests.conftest import (
     VALID_REPO,
