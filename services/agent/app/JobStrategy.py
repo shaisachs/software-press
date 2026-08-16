@@ -1,4 +1,5 @@
 import re
+from typing import Optional, Tuple
 
 
 class JobStrategy:
@@ -17,12 +18,15 @@ class JobStrategy:
 
 class AdHocPromptStrategy(JobStrategy):
     def build_prompt(self) -> str:
-        return self._job_item.job.prompt    
+        return self.job_item.job.prompt
 
 
 class IssueResolveStrategy(JobStrategy):
-    def __init__(self, job_item):
+    def __init__(self, job_item, gh=None, git=None, db=None):
         super().__init__(job_item)
+        self.gh = gh if gh is not None else job_item.gh
+        self.git = git if git is not None else job_item.git
+        self.db = db if db is not None else job_item.db
         self.issue = None
         self.branch = None
         self.default_branch = None
@@ -34,12 +38,36 @@ class IssueResolveStrategy(JobStrategy):
     @property
     def _issue(self):
         if self.issue is None:
-            self.issue = self.job_item.fetch_issue(self._job.issue_number)
+            self.issue = self.fetch_issue(self._job.issue_number)
         return self.issue
+
+    def fetch_issue(self, issue_number: int) -> dict:
+        return self.gh.fetch_issue(issue_number)
+
+    def create_branch(self, branch: str) -> Tuple[str, str]:
+        return self.git.create_branch(branch)
+
+    def push_to_origin(self, branch: str):
+        self.git.push_to_origin(branch)
+
+    def checkout_branch(self, branch: str):
+        self.git.checkout_branch(branch)
+
+    def create_pull_request(
+        self,
+        branch: str,
+        default_branch: str,
+        title: str,
+        issue_number: Optional[int],
+    ) -> Optional[int]:
+        return self.gh.create_pull_request(branch, default_branch, title, issue_number)
+
+    def record_pr_number(self, pr_number: int):
+        self.db.record_pr_number(self._job.job_id, pr_number)
 
     def setup_item_run(self):
         branch = self.branch_name_for_issue(self._issue["title"])
-        (self.default_branch, self.branch) = self.job_item.create_branch(branch)
+        (self.default_branch, self.branch) = self.create_branch(branch)
 
     def build_prompt(self) -> str:
         return (
@@ -51,16 +79,16 @@ class IssueResolveStrategy(JobStrategy):
         )
 
     def close_item_run(self):
-        self.job_item.push_to_origin(self.branch)
+        self.push_to_origin(self.branch)
 
         title = self._issue["title"]
-        pr_number = self.job_item.create_pull_request(
+        pr_number = self.create_pull_request(
             self.branch, self.default_branch, title, self._job.issue_number
         )
         if pr_number is not None:
-            self.job_item.record_pr_number(pr_number)
+            self.record_pr_number(pr_number)
 
-        self.job_item.checkout_branch(self.default_branch)
+        self.checkout_branch(self.default_branch)
 
     @staticmethod
     def _format_issue_text(issue: dict) -> str:

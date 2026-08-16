@@ -4,6 +4,7 @@ from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
 from app.JobItem import JobItem
+from app.JobStrategy import IssueResolveStrategy
 
 from tests.conftest import (
     VALID_REPO,
@@ -92,7 +93,7 @@ def test_dequeue_job_uses_stored_prompt(mocker, tmp_path, monkeypatch):
     db.mark_running.assert_called_once_with(job)
 
 
-def test_dequeue_job_fetches_issue_text_when_prompt_missing(mocker, tmp_path, monkeypatch):
+def test_dequeue_job_defers_issue_resolution_to_strategy(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
@@ -100,35 +101,10 @@ def test_dequeue_job_fetches_issue_text_when_prompt_missing(mocker, tmp_path, mo
     job_item = runner.dequeue_job()
 
     assert job_item.job is job
-    gh.fetch_issue.assert_called_once_with(42)
-    assert "# GitHub Issue #42" in job.prompt
-    assert "Title: Fix the bug" in job.prompt
-    assert "the issue" in job.prompt
+    assert isinstance(job_item.strategy, IssueResolveStrategy)
+    gh.fetch_issue.assert_not_called()
+    assert job.prompt is None
     db.mark_running.assert_called_once_with(job)
-
-
-def test_dequeue_job_marks_failed_on_error(mocker, tmp_path, monkeypatch):
-    use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
-    queue = make_queue(mocker, "abc-123")
-    db = make_db(mocker, job)
-    gh = mocker.Mock()
-    gh.fetch_issue.side_effect = Exception("gh is down")
-
-    def factory(job, db=None):
-        return JobItem(
-            job=job,
-            gh=gh,
-            git=make_git(mocker),
-            command_runner=make_command_runner(mocker),
-            db=db,
-        )
-
-    runner = JobRunner(queue=queue, db=db, job_item_factory=factory)
-
-    assert runner.dequeue_job() is None
-    assert not runner.busy
-    db.complete_job.assert_called_once_with("abc-123", "failed", "Error dequeueing job! gh is down")
 
 
 def test_dequeue_job_marks_failed_when_repo_missing_on_disk(mocker, tmp_path, monkeypatch):
