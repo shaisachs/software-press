@@ -35,7 +35,9 @@ curl -X POST http://localhost:8000/jobs \
 
 The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used. The `type` field is optional; when omitted it is inferred from the request (`adHoc` for a prompt, `issueResolver` for an issue number).
 
-The agent will write and commit code to `workspaces/example/foobar`, in the current branch. It will not push.
+The `branch` field is optional. If omitted, the repo's default branch is used. The agent checks out that branch before doing any work, and checks it back out again when it is done to reset the workspace. For `issueResolver` jobs the requested branch is used as the base of the new pull request.
+
+The agent will write and commit code to `workspaces/example/foobar`, in the target branch. It will not push.
 
 ### Github Issues
 

@@ -56,6 +56,8 @@ def make_git(mocker, has_changes=True):
     git = mocker.Mock()
     git.create_branch.return_value = ("main", "feature/fix-the-bug")
     git.try_stage_changes.return_value = has_changes
+    git.get_default_branch.return_value = "main"
+    git.resolve_branch.side_effect = lambda requested: requested or "main"
     return git
 
 

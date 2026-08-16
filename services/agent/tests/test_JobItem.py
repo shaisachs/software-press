@@ -1,4 +1,5 @@
 import pytest
+from unittest import mock
 
 from app import config
 from app.models import Job
@@ -240,7 +241,7 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     job_item.run()
 
     gh.fetch_issue.assert_called_once_with(42)
-    git.create_branch.assert_called_once_with("feature/fix-the-bug")
+    git.create_branch.assert_called_once_with("feature/fix-the-bug", "main")
     git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
     gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
     git.checkout_branch.assert_called_once_with("main")
@@ -251,6 +252,44 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     assert opencode_calls[0][4] == config.opencode_model()
     assert not (artifact_path / "prompt.txt").exists()
     assert not (artifact_path / "output.txt").exists()
+
+
+def test_run_with_branch_checks_out_requested_branch(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt="fix it", issue_number=None, branch="develop")
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    db = make_db(mocker)
+    job_item = make_job_item(mocker, job, gh=gh, git=git, db=db)
+
+    job_item.run()
+
+    git.resolve_branch.assert_has_calls([mock.call("develop"), mock.call("develop")])
+    git.checkout_branch.assert_has_calls([mock.call("develop"), mock.call("develop")])
+
+
+def test_run_with_issue_number_and_branch_bases_pr_on_requested_branch(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(
+        prompt=None, issue_number=42, artifact_path=artifact_path, type="issueResolver", branch="develop"
+    )
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    git.create_branch.side_effect = lambda branch, base: (base, branch)
+    db = make_db(mocker)
+    command_runner = make_command_runner(mocker)
+    job_item = make_job_item(mocker, job, gh=gh, git=git, command_runner=command_runner, db=db)
+
+    job_item.run()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    git.create_branch.assert_called_once_with("feature/fix-the-bug", "develop")
+    git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
+    gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "develop", "Fix the bug", 42)
+    git.checkout_branch.assert_called_once_with("develop")
+    db.record_pr_number.assert_called_once_with("abc-123", 99)
 
 
 def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch):
@@ -268,7 +307,7 @@ def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch)
     git.push_to_origin.assert_not_called()
     gh.create_pull_request.assert_not_called()
     git.commit_changes.assert_called_once_with()
-    git.checkout_branch.assert_not_called()
+    git.checkout_branch.assert_has_calls([mock.call("main"), mock.call("main")])
     db.record_pr_number.assert_not_called()
 
 
