@@ -16,12 +16,13 @@ from tests.conftest import (
 )
 
 
-def make_work_item(mocker, job, gh=None, git=None, command_runner=None):
+def make_work_item(mocker, job, gh=None, git=None, command_runner=None, db=None):
     return WorkItem(
         job=job,
         gh=gh if gh is not None else make_gh(mocker),
         git=git if git is not None else make_git(mocker),
         command_runner=command_runner if command_runner is not None else make_command_runner(mocker),
+        db=db if db is not None else make_db(mocker),
     )
 
 
@@ -32,8 +33,8 @@ def make_runner(mocker, tmp_path, job=None, queue_job_id="abc-123"):
     git = make_git(mocker)
     command_runner = make_command_runner(mocker)
 
-    def factory(job):
-        return WorkItem(job=job, gh=gh, git=git, command_runner=command_runner)
+    def factory(job, db=None):
+        return WorkItem(job=job, gh=gh, git=git, command_runner=command_runner, db=db)
 
     runner = JobRunner(queue=queue, db=db, work_item_factory=factory)
     return runner, db, gh, git, command_runner
@@ -71,7 +72,7 @@ def test_complete_job_clears_busy(mocker, tmp_path, monkeypatch):
     assert runner.dequeue_job() is not None
     assert runner.busy
 
-    runner.complete_job("abc-123", "completed", None, pr_number=99)
+    runner.complete_job("abc-123", "completed", None)
 
     assert not runner.busy
     assert runner.dequeue_job() is not None
@@ -116,19 +117,20 @@ def test_dequeue_job_marks_failed_on_error(mocker, tmp_path, monkeypatch):
     gh = mocker.Mock()
     gh.fetch_issue.side_effect = Exception("gh is down")
 
-    def factory(job):
+    def factory(job, db=None):
         return WorkItem(
             job=job,
             gh=gh,
             git=make_git(mocker),
             command_runner=make_command_runner(mocker),
+            db=db,
         )
 
     runner = JobRunner(queue=queue, db=db, work_item_factory=factory)
 
     assert runner.dequeue_job() is None
     assert not runner.busy
-    db.complete_job.assert_called_once_with("abc-123", "failed", "gh is down", None)
+    db.complete_job.assert_called_once_with("abc-123", "failed", "gh is down")
 
 
 def test_dequeue_job_marks_failed_when_repo_missing_on_disk(mocker, tmp_path, monkeypatch):
@@ -151,7 +153,7 @@ def test_dequeue_job_marks_failed_when_repo_missing(mocker, tmp_path, monkeypatc
 
     assert runner.dequeue_job() is None
     db.mark_running.assert_not_called()
-    db.complete_job.assert_called_once_with("abc-123", "failed", "repo is required", None)
+    db.complete_job.assert_called_once_with("abc-123", "failed", "repo is required")
 
 
 def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monkeypatch):
@@ -163,7 +165,7 @@ def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monke
 
     assert runner.dequeue_job() is None
     db.mark_running.assert_not_called()
-    db.complete_job.assert_called_once_with("abc-123", "failed", "model is unavailable: deepseek/not-a-model", None)
+    db.complete_job.assert_called_once_with("abc-123", "failed", "model is unavailable: deepseek/not-a-model")
 
 
 def test_dequeue_job_accepts_available_model(mocker, tmp_path, monkeypatch):
@@ -182,105 +184,18 @@ def test_dequeue_job_accepts_available_model(mocker, tmp_path, monkeypatch):
 def test_complete_job_delegates_to_db(mocker, tmp_path):
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
 
-    runner.complete_job("abc-123", "completed", None, pr_number=99)
+    runner.complete_job("abc-123", "completed", None)
 
-    db.complete_job.assert_called_once_with("abc-123", "completed", None, 99)
+    db.complete_job.assert_called_once_with("abc-123", "completed", None)
     assert not runner.busy
 
 
-def test_run_job_with_issue_number(mocker, tmp_path, monkeypatch):
-    repo_dir = use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123",
-        prompt="fix it",
-        issue_number=42,
-        repo=VALID_REPO,
-        artifact_path=artifact_path,
-    )
-    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
-    work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner)
+def test_run_job_delegates_to_work_item(mocker, tmp_path):
+    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path)
+    work_item = mocker.Mock()
+    work_item.run.return_value = 99
 
     pr_number = runner.run_job(work_item)
 
+    work_item.run.assert_called_once_with()
     assert pr_number == 99
-    assert command_runner.working_dir == str(repo_dir)
-    assert (artifact_path / "prompt.txt").read_text() == "fix it"
-    assert (artifact_path / "output.txt").exists()
-    git.create_branch.assert_called_once_with("feature/fix-the-bug")
-    git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
-    gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
-    gh.fetch_issue.assert_called_once_with(42)
-    opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
-    assert len(opencode_calls) == 1
-    assert opencode_calls[0][2] == str(repo_dir)
-    assert opencode_calls[0][4] == config.opencode_model()
-
-
-def test_run_job_uses_selected_model(mocker, tmp_path, monkeypatch):
-    repo_dir = use_workspaces(monkeypatch, tmp_path)
-    monkeypatch.setattr(config, "model_is_available", lambda model: True)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123",
-        prompt="fix it",
-        repo=VALID_REPO,
-        model="deepseek/deepseek-v4-pro",
-        artifact_path=artifact_path,
-    )
-    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
-    work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner)
-
-    pr_number = runner.run_job(work_item)
-
-    assert pr_number is None
-    opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
-    assert len(opencode_calls) == 1
-    assert opencode_calls[0][4] == "deepseek/deepseek-v4-pro"
-
-
-def test_run_job_without_issue_number(mocker, tmp_path, monkeypatch):
-    use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123",
-        prompt="fix it",
-        issue_number=None,
-        repo=VALID_REPO,
-        artifact_path=artifact_path,
-    )
-    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
-    work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner)
-
-    pr_number = runner.run_job(work_item)
-
-    assert pr_number is None
-    git.create_branch.assert_not_called()
-    git.push_to_origin.assert_not_called()
-    gh.create_pull_request.assert_not_called()
-    git.commit_changes.assert_called_once_with()
-
-
-def test_run_job_skips_commit_and_pr_when_no_changes(mocker, tmp_path, monkeypatch):
-    use_workspaces(monkeypatch, tmp_path)
-    artifact_path = tmp_path / "artifacts"
-    artifact_path.mkdir()
-    job = Job(
-        job_id="abc-123",
-        prompt="fix it",
-        issue_number=42,
-        repo=VALID_REPO,
-        artifact_path=artifact_path,
-    )
-    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
-    git.try_stage_changes.return_value = False
-    work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner)
-
-    pr_number = runner.run_job(work_item)
-
-    assert pr_number is None
-    git.commit_changes.assert_not_called()
-    assert "No changes staged" in (artifact_path / "output.txt").read_text()

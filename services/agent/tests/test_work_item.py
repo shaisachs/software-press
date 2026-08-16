@@ -7,6 +7,7 @@ from app.work_item import WorkItem
 from tests.conftest import (
     VALID_REPO,
     make_command_runner,
+    make_db,
     make_gh,
     make_git,
     use_workspaces,
@@ -19,12 +20,13 @@ def make_job(**overrides):
     return Job(**defaults)
 
 
-def make_work_item(mocker, job, gh=None, git=None, command_runner=None):
+def make_work_item(mocker, job, gh=None, git=None, command_runner=None, db=None):
     return WorkItem(
         job=job,
         gh=gh if gh is not None else make_gh(mocker),
         git=git if git is not None else make_git(mocker),
         command_runner=command_runner if command_runner is not None else make_command_runner(mocker),
+        db=db if db is not None else make_db(mocker),
     )
 
 
@@ -135,27 +137,30 @@ def test_init_sets_command_runner_working_dir(mocker, tmp_path, monkeypatch):
     assert command_runner.working_dir == str(repo_dir)
 
 
-def test_init_injects_gh_and_git(mocker, tmp_path, monkeypatch):
+def test_init_injects_dependencies(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     gh = make_gh(mocker)
     git = make_git(mocker)
+    db = make_db(mocker)
     job = make_job()
 
-    work_item = make_work_item(mocker, job, gh=gh, git=git)
+    work_item = make_work_item(mocker, job, gh=gh, git=git, db=db)
 
     assert work_item.gh is gh
     assert work_item.git is git
+    assert work_item.db is db
 
 
-def test_init_constructs_default_dependencies(tmp_path, monkeypatch):
+def test_init_constructs_default_dependencies(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     job = make_job()
 
-    work_item = WorkItem(job=job)
+    work_item = WorkItem(job=job, db=mocker.Mock())
 
     assert work_item.command_runner is not None
     assert work_item.gh is not None
     assert work_item.git is not None
+    assert work_item.db is not None
     assert work_item.command_runner.working_dir == str(tmp_path / VALID_REPO)
 
 
@@ -217,3 +222,153 @@ def test_init_accepts_available_model(mocker, tmp_path, monkeypatch):
     work_item = make_work_item(mocker, job)
 
     assert work_item.model == "deepseek/deepseek-v4-pro"
+
+
+def test_fetch_issue_delegates_to_gh(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    gh = make_gh(mocker)
+    work_item = make_work_item(mocker, make_job(), gh=gh)
+
+    issue = work_item.fetch_issue(42)
+
+    gh.fetch_issue.assert_called_once_with(42)
+    assert issue is gh.fetch_issue.return_value
+
+
+def test_create_branch_delegates_to_git(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    git = make_git(mocker)
+    work_item = make_work_item(mocker, make_job(), git=git)
+
+    result = work_item.create_branch("feature/x")
+
+    git.create_branch.assert_called_once_with("feature/x")
+    assert result is git.create_branch.return_value
+
+
+def test_create_pull_request_delegates_to_gh(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    gh = make_gh(mocker)
+    work_item = make_work_item(mocker, make_job(), gh=gh)
+
+    pr_number = work_item.create_pull_request("feature/x", "main", "title", 42)
+
+    gh.create_pull_request.assert_called_once_with("feature/x", "main", "title", 42)
+    assert pr_number is gh.create_pull_request.return_value
+
+
+def test_record_pr_number_delegates_to_db(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    db = make_db(mocker)
+    work_item = make_work_item(mocker, make_job(), db=db)
+
+    work_item.record_pr_number(99)
+
+    db.record_pr_number.assert_called_once_with("abc-123", 99)
+
+
+def test_run_prompt_invokes_opencode(mocker, tmp_path, monkeypatch):
+    repo_dir = use_workspaces(monkeypatch, tmp_path)
+    command_runner = make_command_runner(mocker)
+    work_item = make_work_item(mocker, make_job(), command_runner=command_runner)
+
+    work_item.run_prompt()
+
+    assert command_runner.run.call_count == 1
+    args = command_runner.run.call_args.args[0]
+    assert args[0] == "opencode"
+    assert args[1] == "--dir"
+    assert args[2] == str(repo_dir)
+    assert args[3] == "--model"
+    assert args[4] == config.opencode_model()
+    assert args[5] == "run"
+    assert args[6] == "--agent"
+    assert args[7] == "build"
+    assert args[8] == "write hello world"
+
+
+def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monkeypatch):
+    repo_dir = use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    db = make_db(mocker)
+    command_runner = make_command_runner(mocker)
+    work_item = make_work_item(mocker, job, gh=gh, git=git, command_runner=command_runner, db=db)
+
+    pr_number = work_item.run()
+
+    assert pr_number == 99
+    assert (artifact_path / "prompt.txt").read_text() == "fix it"
+    assert (artifact_path / "output.txt").exists()
+    gh.fetch_issue.assert_called_once_with(42)
+    git.create_branch.assert_called_once_with("feature/fix-the-bug")
+    git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
+    gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
+    git.checkout_branch.assert_called_once_with("main")
+    db.record_pr_number.assert_called_once_with("abc-123", 99)
+    opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
+    assert len(opencode_calls) == 1
+    assert opencode_calls[0][2] == str(repo_dir)
+    assert opencode_calls[0][4] == config.opencode_model()
+
+
+def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(prompt="fix it", issue_number=None, artifact_path=artifact_path)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    db = make_db(mocker)
+    work_item = make_work_item(mocker, job, gh=gh, git=git, db=db)
+
+    pr_number = work_item.run()
+
+    assert pr_number is None
+    gh.fetch_issue.assert_not_called()
+    git.create_branch.assert_not_called()
+    git.push_to_origin.assert_not_called()
+    gh.create_pull_request.assert_not_called()
+    git.commit_changes.assert_called_once_with()
+    git.checkout_branch.assert_not_called()
+    db.record_pr_number.assert_not_called()
+
+
+def test_run_skips_commit_and_pr_when_no_changes(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    git.try_stage_changes.return_value = False
+    db = make_db(mocker)
+    work_item = make_work_item(mocker, job, gh=gh, git=git, db=db)
+
+    pr_number = work_item.run()
+
+    assert pr_number is None
+    git.commit_changes.assert_not_called()
+    gh.create_pull_request.assert_not_called()
+    db.record_pr_number.assert_not_called()
+    assert "No changes staged" in (artifact_path / "output.txt").read_text()
+
+
+def test_run_uses_selected_model(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    monkeypatch.setattr(config, "model_is_available", lambda model: True)
+    artifact_path = tmp_path / "artifacts"
+    artifact_path.mkdir()
+    job = make_job(prompt="fix it", model="deepseek/deepseek-v4-pro", artifact_path=artifact_path)
+    command_runner = make_command_runner(mocker)
+    work_item = make_work_item(mocker, job, command_runner=command_runner)
+
+    pr_number = work_item.run()
+
+    assert pr_number is None
+    opencode_calls = [c.args[0] for c in command_runner.run.call_args_list if c.args[0][0] == "opencode"]
+    assert len(opencode_calls) == 1
+    assert opencode_calls[0][4] == "deepseek/deepseek-v4-pro"

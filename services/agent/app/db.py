@@ -62,6 +62,25 @@ class Db:
         finally:
             cur.close()
 
+    def record_pr_number(self, job_id: str, pr_number: int):
+        conn = self._connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                UPDATE jobs
+                SET pr_number = %s
+                WHERE id = %s
+                """,
+                (pr_number, job_id),
+            )
+            conn.commit()
+        except Exception as e:
+            print("Error recording pr number! " + str(e))
+            conn.rollback()
+        finally:
+            cur.close()
+
     def complete_job(self, job_id: str, status: str, error_desc: str, pr_number=None):
         conn = self._connection()
         cur = conn.cursor()
