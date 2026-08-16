@@ -12,7 +12,10 @@ class JobStrategy:
     def build_prompt(self) -> str:
         return None
 
-    def close_item_run(self):
+    def commits_changes(self) -> bool:
+        return True
+
+    def close_item_run(self, output: Optional[str] = None):
         pass
 
 
@@ -78,7 +81,7 @@ class IssueResolveStrategy(JobStrategy):
             f"{self._format_issue_text(self._issue)}"
         )
 
-    def close_item_run(self):
+    def close_item_run(self, output: Optional[str] = None):
         self.push_to_origin(self.branch)
 
         title = self._issue["title"]
@@ -117,3 +120,39 @@ class IssueResolveStrategy(JobStrategy):
     def branch_name_for_issue(issue_title: str) -> str:
         kebab = re.sub(r"[^a-z0-9]+", "-", issue_title.lower()).strip("-")
         return f"feature/{kebab}"
+
+
+class IssueArchitectStrategy(JobStrategy):
+    def __init__(self, job_item, gh=None, git=None, db=None):
+        super().__init__(job_item)
+        self.gh = gh if gh is not None else job_item.gh
+        self.git = git if git is not None else job_item.git
+        self.db = db if db is not None else job_item.db
+        self.issue = None
+
+    @property
+    def _job(self):
+        return self.job_item.job
+
+    @property
+    def _issue(self):
+        if self.issue is None:
+            self.issue = self.gh.fetch_issue(self._job.issue_number)
+        return self.issue
+
+    def commits_changes(self) -> bool:
+        return False
+
+    def build_prompt(self) -> str:
+        return (
+            "A GitHub issue has been filed against this repository - the body and comments are below. "
+            "Research the codebase and propose an implementation approach to resolve it. "
+            "Do not write or commit any code. Instead, describe the approach you would take, "
+            "the files you would modify, and any trade-offs to consider.\n\n"
+            f"# GitHub Issue #{self._job.issue_number}\n\n"
+            f"{IssueResolveStrategy._format_issue_text(self._issue)}"
+        )
+
+    def close_item_run(self, output: Optional[str] = None):
+        if output:
+            self.gh.create_issue_comment(self._job.issue_number, output)

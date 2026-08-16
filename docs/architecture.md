@@ -7,18 +7,21 @@ the actual editing against a checked-out copy of your repository.
 
 ## High-level flow
 
-1. A client submits a **job** to the API via `POST /jobs`, either as an *ad hoc
-   prompt* or a *GitHub issue number*.
-2. The API validates the request, inserts a row into **Postgres**, and pushes the
-   job id onto a **Redis** queue.
+1. A client submits a **job** to the API via `POST /jobs`, as an *ad hoc
+   prompt*, a *GitHub issue number* to resolve, or a *GitHub issue number* to
+   architect (research only).
+2. The API validates the request (per its `type`: `adHoc`, `issueResolver`, or
+   `issueArchitect`), inserts a row into **Postgres**, and pushes the job id
+   onto a **Redis** queue.
 3. The **agent** worker block-pops the job id off the queue, loads the job from
    Postgres, and marks it `running`.
 4. For issue jobs it fetches the issue (and its comments) from GitHub via the
    `gh` CLI, then wraps it into a prompt.
 5. The agent runs **opencode** (the CLI agent) in the target repo's workspace,
    pointed at the requested model (local **Ollama** or cloud **Deepseek**).
-6. opencode writes files and commits them with git. For issue jobs the agent
-   pushes the branch and opens a pull request.
+6. opencode writes files and commits them with git. For `issueResolver` jobs the
+   agent pushes the branch and opens a pull request; for `issueArchitect` jobs
+   the agent posts the research proposal as a comment on the issue instead.
 7. The agent records the outcome (success/failure, PR number, artifact paths)
    back in Postgres; the client can poll `GET /jobs/{job_id}` for the result.
 
@@ -61,13 +64,15 @@ flowchart LR
 A FastAPI service (port `8000`) that exposes:
 
 - `GET /health` - reports connectivity to Postgres and Redis.
-- `POST /jobs` - accepts either a `prompt` (ad hoc) or an `issueNumber`
-  (GitHub issue) plus an optional `model` (`provider/model` format, e.g.
-  `deepseek/deepseek-v4-pro`). Exactly one of `prompt`/`issueNumber` must be
-  set. It creates a UUID job id, inserts a `queued` row into Postgres, and
-  pushes the job id onto the Redis `jobs` queue.
+- `POST /jobs` - accepts a `prompt` (ad hoc), an `issueNumber` (GitHub issue),
+  or both when paired with `type` (`issueArchitect`), plus an optional `model`
+  (`provider/model` format, e.g. `deepseek/deepseek-v4-pro`). Each job must
+  carry a `type`: `adHoc` (prompt only), `issueResolver` (issue number only),
+  or `issueArchitect` (issue number only, research only). If `type` is omitted
+  it is inferred from the payload. It creates a UUID job id, inserts a `queued`
+  row into Postgres, and pushes the job id onto the Redis `jobs` queue.
 - `GET /jobs/{job_id}` - returns the job's status, prompt, error, artifact
-  path, and pull request number.
+  path, pull request number, and type.
 
 ### sp-agent (`services/agent`) - worker
 
@@ -87,8 +92,10 @@ Redis `jobs` queue. For each job it:
 6. Stages and commits any changes (`app/GitClient.py`). A `prepare-commit-msg`
    git hook invokes opencode again to auto-generate a Conventional Commits
    message.
-7. For issue jobs: pushes the `feature/...` branch to origin and creates a pull
-   request via `gh pr create`; for ad hoc jobs it only commits locally.
+7. For `issueResolver` jobs: pushes the `feature/...` branch to origin and
+   creates a pull request via `gh pr create`; for `issueArchitect` jobs: posts
+   the agent's proposal as a comment on the issue (`gh issue comment`) and makes
+   no code changes; for ad hoc jobs it only commits locally.
 8. Records `completed`/`failed` status, any error, and the PR number in
    Postgres.
 
@@ -103,7 +110,7 @@ migrations as already applied without running them.
 
 ### sp-postgres - job store
 
-Postgres 16 holding the `jobs` table (schema in `migrations/001..005`):
+Postgres 16 holding the `jobs` table (schema in `migrations/001..006`):
 
 | column | purpose |
 | --- | --- |
@@ -112,6 +119,7 @@ Postgres 16 holding the `jobs` table (schema in `migrations/001..005`):
 | `issue_number` | GitHub issue to resolve, if any |
 | `repo` | `org/repo` targeted by the job |
 | `model` | requested `provider/model`, optional |
+| `type` | `adHoc` / `issueResolver` / `issueArchitect` |
 | `status` | `queued` / `running` / `completed` / `failed` |
 | `artifact_path` | artifact directory for the job |
 | `error` | error text on failure |
@@ -173,6 +181,10 @@ curl -X POST http://localhost:8000/jobs \
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
     -d '{"repo": "example/foobar", "issueNumber": 42}'
+
+curl -X POST http://localhost:8000/jobs \
+    -H "Content-Type: application/json" \
+    -d '{"repo": "example/foobar", "issueNumber": 42, "type": "issueArchitect"}'
 ```
 
 Then poll `curl http://localhost:8000/jobs/{job_id}` until `status` becomes

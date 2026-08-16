@@ -33,7 +33,7 @@ curl -X POST http://localhost:8000/jobs \
     }'
 ```
 
-The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used.
+The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used. The `type` field is optional; when omitted it is inferred from the request (`adHoc` for a prompt, `issueResolver` for an issue number).
 
 The agent will write and commit code to `workspaces/example/foobar`, in the current branch. It will not push.
 
@@ -48,6 +48,18 @@ curl -X POST http://localhost:8000/jobs \
 ```
 
 The agent uses `gh` to fetch the specified issue, for the Github repository at `workspaces/example/foobar`; it builds a prompt around the issue, and executes the prompt. The resulting code is saved to a new branch, which is pushed and turned into a new pull request.
+
+### Issue architecting
+
+To research an issue and propose an implementation approach *without* changing any code, use `type: "issueArchitect"`:
+
+```
+curl -X POST http://localhost:8000/jobs \
+    -H "Content-Type: application/json" \
+    -d '{"repo": "example/foobar", "issueNumber": 42, "type": "issueArchitect"}'
+```
+
+The agent fetches the issue, researches the codebase, and posts the proposed implementation approach as a new comment on the issue. No code is committed and no pull request is created.
 
 ### Output and debugging
 

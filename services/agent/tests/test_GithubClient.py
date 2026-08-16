@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from app.GithubClient import GithubClient
 
 from tests.conftest import make_result
@@ -115,3 +117,27 @@ def test_create_pull_request_returns_none_on_error(recording_runner, monkeypatch
     )
 
     assert pr_number is None
+
+
+def test_create_issue_comment_posts_to_issue(recording_runner, monkeypatch, mocker):
+    monkeypatch.setenv("GH_TOKEN", "secret")
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
+    recording_runner.on("issue comment", make_result(mocker, stdout="posted"))
+
+    gh = GithubClient(recording_runner)
+    gh.create_issue_comment(42, "Proposed approach: refactor the parser.")
+
+    recording_runner.run.assert_any_call(["gh", "auth", "status"])
+    recording_runner.run.assert_any_call(
+        ["gh", "issue", "comment", "42", "--body", "Proposed approach: refactor the parser."]
+    )
+
+
+def test_create_issue_comment_raises_on_error(recording_runner, monkeypatch, mocker):
+    monkeypatch.setenv("GH_TOKEN", "secret")
+    recording_runner.on("auth status", make_result(mocker, returncode=0))
+    recording_runner.on("issue comment", make_result(mocker, returncode=1, stderr="boom"))
+
+    gh = GithubClient(recording_runner)
+    with pytest.raises(Exception, match="gh issue comment failed"):
+        gh.create_issue_comment(42, "Proposed approach.")

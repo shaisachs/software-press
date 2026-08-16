@@ -37,8 +37,8 @@ def test_create_job_with_prompt(client, mocked_deps):
 
     sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
-    assert "VALUES (%s, %s, %s, %s, %s, 'queued')" in sql
-    assert params == (job_id, "write hello world", None, VALID_REPO, None)
+    assert "VALUES (%s, %s, %s, %s, %s, %s, 'queued')" in sql
+    assert params == (job_id, "write hello world", None, VALID_REPO, None, "adHoc")
     mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
@@ -53,7 +53,24 @@ def test_create_job_with_issue_number(client, mocked_deps):
 
     sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
-    assert params == (job_id, None, 42, VALID_REPO, None)
+    assert params == (job_id, None, 42, VALID_REPO, None, "issueResolver")
+    mocked_deps["conn"].commit.assert_called_once_with()
+    mocked_deps["enqueue_job"].assert_called_once_with(job_id)
+
+
+def test_create_job_with_issue_architect(client, mocked_deps):
+    resp = client.post(
+        "/jobs", json={"type": "issueArchitect", "issueNumber": 42, "repo": VALID_REPO}
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    job_id = body["job_id"]
+    assert str(uuid.UUID(job_id)) == job_id
+
+    sql, params = mocked_deps["cursor"].execute.call_args.args
+    assert "INSERT INTO jobs" in sql
+    assert params == (job_id, None, 42, VALID_REPO, None, "issueArchitect")
     mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
@@ -71,7 +88,7 @@ def test_create_job_with_model(client, mocked_deps):
 
     sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "INSERT INTO jobs" in sql
-    assert params == (job_id, "write hello world", None, VALID_REPO, "deepseek/deepseek-v4-pro")
+    assert params == (job_id, "write hello world", None, VALID_REPO, "deepseek/deepseek-v4-pro", "adHoc")
     mocked_deps["conn"].commit.assert_called_once_with()
     mocked_deps["enqueue_job"].assert_called_once_with(job_id)
 
@@ -116,7 +133,7 @@ def test_create_job_rejects_both_prompt_and_issue(client, mocked_deps):
     resp = client.post("/jobs", json={"prompt": "hi", "issueNumber": 1, "repo": VALID_REPO})
 
     assert resp.status_code == 400
-    assert "exactly one" in str(resp.json()["detail"])
+    assert "adHoc job must not have an 'issueNumber'" in str(resp.json()["detail"])
     mocked_deps["enqueue_job"].assert_not_called()
 
 
@@ -138,6 +155,7 @@ def test_get_job_returns_row(client, mocked_deps):
         42,
         VALID_REPO,
         "deepseek/deepseek-v4-pro",
+        "issueArchitect",
     )
 
     resp = client.get("/jobs/abc-123")
@@ -153,6 +171,7 @@ def test_get_job_returns_row(client, mocked_deps):
         "issue_number": 42,
         "repo": VALID_REPO,
         "model": "deepseek/deepseek-v4-pro",
+        "type": "issueArchitect",
     }
     sql, params = mocked_deps["cursor"].execute.call_args.args
     assert "SELECT" in sql

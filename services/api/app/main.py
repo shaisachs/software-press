@@ -47,10 +47,10 @@ def create_job(req: CreateJobRequest):
 
     cur.execute(
         """
-        INSERT INTO jobs (id, prompt, issue_number, repo, model, status)
-        VALUES (%s, %s, %s, %s, %s, 'queued')
+        INSERT INTO jobs (id, prompt, issue_number, repo, model, type, status)
+        VALUES (%s, %s, %s, %s, %s, %s, 'queued')
         """,
-        (job_id, req.prompt, req.issueNumber, req.repo, req.model),
+        (job_id, req.prompt, req.issueNumber, req.repo, req.model, req.type),
     )
 
     conn.commit()
@@ -78,7 +78,8 @@ def get_job(job_id: str):
             pr_number,
             issue_number,
             repo,
-            model
+            model,
+            type
         FROM jobs
         WHERE id = %s
         """,
@@ -100,4 +101,5 @@ def get_job(job_id: str):
         "issue_number": row[6],
         "repo": row[7],
         "model": row[8],
+        "type": row[9],
     }

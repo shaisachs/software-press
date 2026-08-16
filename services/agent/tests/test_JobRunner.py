@@ -4,7 +4,7 @@ from app import config
 from app.models import Job
 from app.JobRunner import JobRunner
 from app.JobItem import JobItem
-from app.JobStrategy import IssueResolveStrategy
+from app.JobStrategy import IssueArchitectStrategy, IssueResolveStrategy
 
 from tests.conftest import (
     VALID_REPO,
@@ -49,7 +49,7 @@ def test_dequeue_job_returns_none_when_queue_empty(mocker, tmp_path):
 
 def test_dequeue_job_returns_none_while_busy(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     first = runner.dequeue_job()
@@ -67,7 +67,7 @@ def test_dequeue_job_returns_none_while_busy(mocker, tmp_path, monkeypatch):
 
 def test_complete_job_clears_busy(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     assert runner.dequeue_job() is not None
@@ -82,7 +82,7 @@ def test_complete_job_clears_busy(mocker, tmp_path, monkeypatch):
 
 def test_dequeue_job_uses_stored_prompt(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     job_item = runner.dequeue_job()
@@ -95,7 +95,7 @@ def test_dequeue_job_uses_stored_prompt(mocker, tmp_path, monkeypatch):
 
 def test_dequeue_job_defers_issue_resolution_to_strategy(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO, type="issueResolver")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     job_item = runner.dequeue_job()
@@ -107,9 +107,22 @@ def test_dequeue_job_defers_issue_resolution_to_strategy(mocker, tmp_path, monke
     db.mark_running.assert_called_once_with(job)
 
 
+def test_dequeue_job_selects_issue_architect_strategy(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO, type="issueArchitect")
+    runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
+
+    job_item = runner.dequeue_job()
+
+    assert job_item.job is job
+    assert isinstance(job_item.strategy, IssueArchitectStrategy)
+    gh.fetch_issue.assert_not_called()
+    db.mark_running.assert_called_once_with(job)
+
+
 def test_dequeue_job_marks_failed_when_repo_missing_on_disk(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo="owner/not-cloned")
+    job = Job(job_id="abc-123", prompt="write hello world", repo="owner/not-cloned", type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     assert runner.dequeue_job() is None
@@ -122,7 +135,7 @@ def test_dequeue_job_marks_failed_when_repo_missing_on_disk(mocker, tmp_path, mo
 
 
 def test_dequeue_job_marks_failed_when_repo_missing(mocker, tmp_path, monkeypatch):
-    job = Job(job_id="abc-123", prompt="write hello world", repo=None)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=None, type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     assert runner.dequeue_job() is None
@@ -132,7 +145,7 @@ def test_dequeue_job_marks_failed_when_repo_missing(mocker, tmp_path, monkeypatc
 
 def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/not-a-model")
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/not-a-model", type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     monkeypatch.setattr(config, "model_is_available", lambda model: False)
@@ -144,7 +157,7 @@ def test_dequeue_job_marks_failed_when_model_unavailable(mocker, tmp_path, monke
 
 def test_dequeue_job_accepts_available_model(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/deepseek-v4-pro")
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, model="deepseek/deepseek-v4-pro", type="adHoc")
     runner, db, gh, git, command_runner = make_runner(mocker, tmp_path, job=job)
 
     monkeypatch.setattr(config, "model_is_available", lambda model: True)
@@ -183,7 +196,7 @@ def test_run_job_delegates_to_job_item(mocker, tmp_path):
 
 def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     command_runner = make_command_runner(mocker)
     job_item = make_job_item(mocker, job, command_runner=command_runner)
 
@@ -195,12 +208,26 @@ def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatc
     assert (artifact_path / "output.txt").exists()
 
 
+def test_run_job_skips_prompt_artifact_when_prompt_none(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = Job(job_id="abc-123", prompt=None, issue_number=42, repo=VALID_REPO, type="issueArchitect")
+    command_runner = make_command_runner(mocker)
+    job_item = make_job_item(mocker, job, command_runner=command_runner)
+
+    runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)
+    runner.run_job(job_item)
+
+    artifact_path = next((tmp_path / "artifacts").glob("*-abc-123"))
+    assert not (artifact_path / "prompt.txt").exists()
+    assert (artifact_path / "output.txt").exists()
+
+
 def test_run_job_emits_command_output_to_output_file(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
     job = Job(
-        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path
+        job_id="abc-123", prompt="write hello world", repo=VALID_REPO, artifact_path=artifact_path, type="adHoc"
     )
     command_runner = make_command_runner(mocker)
     seen_output_files = []
@@ -219,7 +246,7 @@ def test_run_job_emits_command_output_to_output_file(mocker, tmp_path, monkeypat
 
 def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
     job_item = make_job_item(mocker, job, git=git)
@@ -233,7 +260,7 @@ def test_run_job_writes_no_changes_message(mocker, tmp_path, monkeypatch):
 
 def test_run_job_skips_no_changes_message_when_changes_staged(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO)
+    job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     job_item = make_job_item(mocker, job)
 
     runner, db, gh, git, _ = make_runner(mocker, tmp_path, job=job)

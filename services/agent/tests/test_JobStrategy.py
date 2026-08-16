@@ -1,11 +1,15 @@
 from app.models import Job
-from app.JobStrategy import AdHocPromptStrategy, IssueResolveStrategy
+from app.JobStrategy import (
+    AdHocPromptStrategy,
+    IssueArchitectStrategy,
+    IssueResolveStrategy,
+)
 
 from tests.conftest import make_db, make_gh, make_git
 
 
 def make_job(**overrides):
-    defaults = dict(job_id="abc-123", prompt=None, issue_number=42)
+    defaults = dict(job_id="abc-123", prompt=None, issue_number=42, type="issueResolver")
     defaults.update(overrides)
     return Job(**defaults)
 
@@ -22,6 +26,17 @@ def make_job_item(mocker, job, gh=None, git=None, db=None):
 def make_strategy(mocker, job=None, gh=None, git=None, db=None):
     job_item = make_job_item(mocker, job if job is not None else make_job(), gh=gh, git=git, db=db)
     return IssueResolveStrategy(job_item)
+
+
+def make_architect_strategy(mocker, job=None, gh=None, git=None, db=None):
+    job_item = make_job_item(
+        mocker,
+        job if job is not None else make_job(type="issueArchitect"),
+        gh=gh,
+        git=git,
+        db=db,
+    )
+    return IssueArchitectStrategy(job_item)
 
 
 def test_build_prompt():
@@ -66,13 +81,14 @@ def test_branch_name_for_issue():
 def test_adhoc_prompt_strategy_operations_are_trivial(mocker):
     gh = make_gh(mocker)
     git = make_git(mocker)
-    job = make_job(prompt="write hello world")
+    job = make_job(prompt="write hello world", type="adHoc", issue_number=None)
     job_item = make_job_item(mocker, job, gh=gh, git=git)
 
     strategy = AdHocPromptStrategy(job_item)
 
     strategy.setup_item_run()
     assert strategy.build_prompt() == "write hello world"
+    assert strategy.commits_changes()
     strategy.close_item_run()
 
     gh.fetch_issue.assert_not_called()
@@ -176,3 +192,57 @@ def test_issue_resolve_close_item_run_creates_pr_and_checks_out(mocker):
     gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
     db.record_pr_number.assert_called_once_with("abc-123", 99)
     git.checkout_branch.assert_called_once_with("main")
+
+
+def test_issue_architect_setup_item_run_is_trivial(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    strategy = make_architect_strategy(mocker, gh=gh, git=git)
+
+    strategy.setup_item_run()
+
+    gh.fetch_issue.assert_not_called()
+    git.create_branch.assert_not_called()
+
+
+def test_issue_architect_does_not_commit_changes(mocker):
+    strategy = make_architect_strategy(mocker)
+
+    assert strategy.commits_changes() is False
+
+
+def test_issue_architect_build_prompt_from_issue(mocker):
+    gh = make_gh(mocker)
+    strategy = make_architect_strategy(mocker, gh=gh)
+
+    prompt = strategy.build_prompt()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    assert "# GitHub Issue #42" in prompt
+    assert "Title: Fix the bug" in prompt
+    assert "the issue" in prompt
+    assert "Do not write or commit any code" in prompt
+
+
+def test_issue_architect_close_item_run_posts_comment_with_output(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    strategy = make_architect_strategy(mocker, gh=gh, git=git)
+
+    strategy.close_item_run(output="Proposed approach: refactor the parser.")
+
+    gh.create_issue_comment.assert_called_once_with(
+        42, "Proposed approach: refactor the parser."
+    )
+    git.push_to_origin.assert_not_called()
+    gh.create_pull_request.assert_not_called()
+
+
+def test_issue_architect_close_item_run_skips_comment_when_no_output(mocker):
+    gh = make_gh(mocker)
+    strategy = make_architect_strategy(mocker, gh=gh)
+
+    strategy.close_item_run(output=None)
+    strategy.close_item_run(output="")
+
+    gh.create_issue_comment.assert_not_called()
