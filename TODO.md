@@ -4,4 +4,4 @@
 - [ ] runner - use strategy pattern so the issue-number stuff is tidied away
 - [ ] resiliency around failed commands and repo in a weird state, etc.
 - [x] automatically do all migrations that are not-done when postgres starts up
-- [ ] real mocking setup for unit tests
+- [x real mocking setup for unit tests
