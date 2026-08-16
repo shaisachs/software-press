@@ -3,6 +3,7 @@ import pytest
 from app import config
 from app.models import Job
 from app.JobItem import JobItem
+from app.JobStrategy import AdHocPromptStrategy, IssueResolveStrategy
 
 from tests.conftest import (
     VALID_REPO,
@@ -31,7 +32,7 @@ def make_job_item(mocker, job, gh=None, git=None, command_runner=None, db=None):
 
 
 def test_build_prompt():
-    prompt = JobItem._build_prompt(42, "the body")
+    prompt = IssueResolveStrategy._build_prompt(42, "the body")
     assert "# GitHub Issue #42" in prompt
     assert "the body" in prompt
 
@@ -44,7 +45,7 @@ def test_format_issue_text():
         "comments": [{"body": "First comment"}, {"body": "Second comment"}],
     }
 
-    text = JobItem._format_issue_text(issue)
+    text = IssueResolveStrategy._format_issue_text(issue)
 
     assert "Title: Refactor things" in text
     assert "Body: Please refactor." in text
@@ -56,7 +57,7 @@ def test_format_issue_text():
 def test_format_issue_text_without_comments():
     issue = {"number": 42, "title": "Refactor things", "body": "Please refactor.", "comments": []}
 
-    text = JobItem._format_issue_text(issue)
+    text = IssueResolveStrategy._format_issue_text(issue)
 
     assert "Title: Refactor things" in text
     assert "Body: Please refactor." in text
@@ -64,9 +65,9 @@ def test_format_issue_text_without_comments():
 
 
 def test_branch_name_for_issue():
-    assert JobItem.branch_name_for_issue("Add the Bitter Lesson") == "feature/add-the-bitter-lesson"
-    assert JobItem.branch_name_for_issue("  Fix  This   Bug  ") == "feature/fix-this-bug"
-    assert JobItem.branch_name_for_issue("Needs: Proper Casing!") == "feature/needs-proper-casing"
+    assert IssueResolveStrategy.branch_name_for_issue("Add the Bitter Lesson") == "feature/add-the-bitter-lesson"
+    assert IssueResolveStrategy.branch_name_for_issue("  Fix  This   Bug  ") == "feature/fix-this-bug"
+    assert IssueResolveStrategy.branch_name_for_issue("Needs: Proper Casing!") == "feature/needs-proper-casing"
 
 
 def test_workspace_dir(tmp_path, monkeypatch):
@@ -214,6 +215,99 @@ def test_init_accepts_available_model(mocker, tmp_path, monkeypatch):
     assert job_item.model == "deepseek/deepseek-v4-pro"
 
 
+def test_init_selects_adhoc_prompt_strategy_when_prompt_present(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt="write hello world", issue_number=42)
+
+    job_item = make_job_item(mocker, job)
+
+    assert isinstance(job_item.strategy, AdHocPromptStrategy)
+
+
+def test_init_selects_issue_resolve_strategy_when_prompt_missing(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42)
+
+    job_item = make_job_item(mocker, job)
+
+    assert isinstance(job_item.strategy, IssueResolveStrategy)
+
+
+def test_init_raises_when_no_prompt_or_issue_number(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=None)
+
+    with pytest.raises(Exception, match="prompt or an issue number"):
+        make_job_item(mocker, job)
+
+
+def test_adhoc_prompt_strategy_operations_are_trivial(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job_item = make_job_item(mocker, make_job(), gh=gh, git=git)
+
+    strategy = job_item.strategy
+
+    strategy.setup_item_run()
+    strategy.build_prompt()
+    strategy.close_item_run()
+
+    gh.fetch_issue.assert_not_called()
+    git.create_branch.assert_not_called()
+    git.push_to_origin.assert_not_called()
+    gh.create_pull_request.assert_not_called()
+
+
+def test_issue_resolve_setup_item_run_creates_branch(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job_item = make_job_item(mocker, job, gh=gh, git=git)
+
+    strategy = job_item.strategy
+    strategy.setup_item_run()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    git.create_branch.assert_called_once_with("feature/fix-the-bug")
+    assert strategy.default_branch == "main"
+    assert strategy.branch == "feature/fix-the-bug"
+
+
+def test_issue_resolve_build_prompt_from_issue(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42)
+    gh = make_gh(mocker)
+    job_item = make_job_item(mocker, job, gh=gh)
+
+    strategy = job_item.strategy
+    strategy.build_prompt()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    assert "# GitHub Issue #42" in job.prompt
+    assert "Title: Fix the bug" in job.prompt
+    assert "the issue" in job.prompt
+
+
+def test_issue_resolve_close_item_run_creates_pr_and_checks_out(mocker, tmp_path, monkeypatch):
+    use_workspaces(monkeypatch, tmp_path)
+    job = make_job(prompt=None, issue_number=42)
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    db = make_db(mocker)
+    job_item = make_job_item(mocker, job, gh=gh, git=git, db=db)
+
+    strategy = job_item.strategy
+    strategy.setup_item_run()
+    strategy.close_item_run()
+
+    git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
+    gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
+    db.record_pr_number.assert_called_once_with("abc-123", 99)
+    git.checkout_branch.assert_called_once_with("main")
+
+
 def test_fetch_issue_delegates_to_gh(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     gh = make_gh(mocker)
@@ -281,7 +375,7 @@ def test_run_with_issue_number_creates_pr_and_records_it(mocker, tmp_path, monke
     repo_dir = use_workspaces(monkeypatch, tmp_path)
     artifact_path = tmp_path / "artifacts"
     artifact_path.mkdir()
-    job = make_job(prompt="fix it", issue_number=42, artifact_path=artifact_path)
+    job = make_job(prompt=None, issue_number=42, artifact_path=artifact_path)
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
@@ -325,7 +419,7 @@ def test_run_without_issue_number_commits_locally(mocker, tmp_path, monkeypatch)
 
 def test_run_skips_commit_and_pr_when_no_changes(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
-    job = make_job(prompt="fix it", issue_number=42)
+    job = make_job(prompt=None, issue_number=42)
     gh = make_gh(mocker)
     git = make_git(mocker)
     git.try_stage_changes.return_value = False
