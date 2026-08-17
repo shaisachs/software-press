@@ -102,7 +102,7 @@ Postgres and Redis containers (no mocks):
 The script stands up throwaway `postgres-test` and `redis-test` containers,
 applies all migrations (via the same `scripts/migrate.sh` path used in
 production), boots the real API, and runs a [Karate](https://karate.io) suite
-(`functional_tests/karate/`) against it. Because the dependencies are real, the
+(`services/api/tests/functional/`) against it. Because the dependencies are real, the
 Karate scenarios can assert state the API cannot see over HTTP:
 
 * row-level assertions against Postgres (via JDBC through a small

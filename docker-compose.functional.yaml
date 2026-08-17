@@ -61,11 +61,11 @@ services:
       start_period: 5s
 
   karate-runner:
-    build: ./functional_tests/karate
+    build: ./services/api/tests/functional
     depends_on:
       api-test:
         condition: service_healthy
     volumes:
-      - ./functional_tests/karate:/tests
+      - ./services/api/tests/functional:/tests
     working_dir: /tests
     command: ["/tests"]

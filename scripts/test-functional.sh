@@ -3,7 +3,7 @@
 #
 # Stands up throwaway Postgres and Redis containers, applies all migrations
 # (via the same scripts/migrate.sh path used in production), boots the real API,
-# and runs the Karate suite in functional_tests/karate against it. The Karate
+# and runs the Karate suite in services/api/tests/functional against it. The Karate
 # scenarios assert row-level state directly against Postgres (JDBC) and verify
 # queue membership directly against Redis (jedis).
 #
