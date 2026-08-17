@@ -18,12 +18,12 @@ PROJECT="software-press-functional"
 API_CONTAINER="sp-test-api"
 
 cleanup() {
-  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" down -v
+  docker compose --progress quiet -p "$PROJECT" -f "$COMPOSE_FILE" down -v
 }
 trap cleanup EXIT
 
-echo "==> Starting throwaway Postgres, Redis, migrations, and API"
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build \
+echo "==> Starting test containers"
+docker compose --progress quiet -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build \
   postgres-test redis-test db-migrate-test api-test
 
 echo "==> Waiting for api-test to become healthy"
@@ -37,17 +37,16 @@ for _ in $(seq 1 60); do
 done
 if [ "$status" != "healthy" ]; then
   echo "error: api-test did not become healthy" >&2
-  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" logs --no-color >&2 || true
+  docker compose --progress quiet -p "$PROJECT" -f "$COMPOSE_FILE" logs --no-color >&2 || true
   exit 1
 fi
 
 echo "==> Running Karate functional suite"
 status=0
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" run --rm -T --build karate-runner || status=$?
+docker compose --progress quiet -p "$PROJECT" -f "$COMPOSE_FILE" run --rm -T --build karate-runner || status=$?
 
 if [ "$status" -ne 0 ]; then
   echo "==> Functional test suite FAILED (exit $status)" >&2
-  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" logs --no-color >&2 || true
   exit "$status"
 fi
 
