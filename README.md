@@ -9,7 +9,7 @@ See [docs/architecture.md](docs/architecture.md) for an overview of how the syst
 * Copy `.env` to `.env.prod`.
 * Provide your Docker API key, Git name/email, and Github access token, in `.env`.
 * Copy the SSH private key you use to access your git remote server into `services/agent/id_rsa`.
-* Clone the repo you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces/example/foobar`
+* Clone the repos you want into `workspaces`: `git clone git@github.com:example/foobar.git workspaces/example/foobar`
 
 To start:
 
@@ -27,52 +27,60 @@ For an *ad hoc* prompt:
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
     -d '{
+        "type": "adHoc",
         "repo": "example/foobar",
+        "branch": "feature/dingbats",
         "prompt": "Write a hello world Python script and save it to helloworld.py",
         "model": "deepseek/deepseek-v4-pro"
     }'
 ```
 
-The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used. The `type` field is optional; when omitted it is inferred from the request (`adHoc` for a prompt, `issueResolver` for an issue number).
+The `type` field is optional; when omitted it is inferred from the request (`adHoc` for a prompt, `issueResolver` for an issue number).
 
-The `branch` field is optional. If omitted, the repo's default branch is used. The agent checks out that branch before doing any work, and checks it back out again when it is done to reset the workspace. For `issueResolver` jobs the requested branch is used as the base of the new pull request.
+The `branch` field is optional. If omitted, the repo's default branch is used. The agent checks out that branch before doing any work, and checks it back out again when it is done to reset the workspace. If the branch specified can't be checked out, the job will fail before doing any work.
+
+The `model` field is optional and must be in `provider/model` format. If omitted, the default model from the environment is used.
 
 The agent will write and commit code to `workspaces/example/foobar`, in the target branch. It will not push.
 
-### Github Issues
+### Github issue resolving
 
 To turn a GitHub issue into a pull request:
 
 ```
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
-    -d '{"repo": "example/foobar", "issueNumber": 42}'
+    -d '{"type": "issueResolver", "repo": "example/foobar", "issueNumber": 42}'
 ```
 
 The agent uses `gh` to fetch the specified issue, for the Github repository at `workspaces/example/foobar`; it builds a prompt around the issue, and executes the prompt. The resulting code is saved to a new branch, which is pushed and turned into a new pull request.
 
-### Issue architecting
+The `branch` and `model` field are supported as for ad hoc prompts. The requested branch is used as the base of the new pull request.
+
+### Github issue architecting
 
 To research an issue and propose an implementation approach *without* changing any code, use `type: "issueArchitect"`:
 
 ```
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
-    -d '{"repo": "example/foobar", "issueNumber": 42, "type": "issueArchitect"}'
+    -d '{"type": "issueArchitect", "repo": "example/foobar", "issueNumber": 42}'
 ```
 
 The agent fetches the issue, researches the codebase, and posts the proposed implementation approach as a new comment on the issue. No code is committed and no pull request is created.
 
+The `branch` and `model` field are supported as for ad hoc prompts.
+
 ### Output and debugging
 
-For both of the above requests, the response is:
+For all of the above requests, the response is:
 
 ```
 {"job_id":"c733610a-9714-430e-8d07-3941afd8e29c","status":"queued"}
 ```
 
 When the job completes, you should see:
-* Artifacts from the job in `artifacts/{datestamp}-{job_id}` - e.g. `artifacts/20260811180005-c733610a-9714-430e-8d07-3941afd8e29c/prompt.txt` and `artifacts/20260811180005-c733610a-9714-430e-8d07-3941afd8e29c/output.txt`.
+* Artifacts from the job in `artifacts/{datestamp}-{job_id}` - specifically, log output in `artifacts/20260811180005-c733610a-9714-430e-8d07-3941afd8e29c/output.txt`.
 * Files written by the job in `workspaces/`
 * All of the above is available by querying `curl http://localhost:8000/jobs/{job_id}`.
 
@@ -104,12 +112,7 @@ Postgres and Redis containers (no mocks):
 The script stands up throwaway `postgres-test` and `redis-test` containers,
 applies all migrations (via the same `scripts/migrate.sh` path used in
 production), boots the real API, and runs a [Karate](https://karate.io) suite
-(`services/api/tests/functional/`) against it. Because the dependencies are real, the
-Karate scenarios can assert state the API cannot see over HTTP:
-
-* row-level assertions against Postgres (via JDBC through a small
-  `karatehelpers.DbUtils` helper), and
-* direct queue-membership checks against Redis (via jedis).
+(`services/api/tests/functional/`) against it.
 
 The suite exits non-zero on any failure, and a GitHub Actions workflow
 (`.github/workflows/functional-tests.yml`) runs it as a gate on push / pull
@@ -135,3 +138,11 @@ opencode --dir /workspaces --model sp-ollama/qwen2.5:0.5b run "Write a poem abou
 ```
 
 The poem should appear in `./workspaces/penguins.txt`.
+
+Inspect the database:
+
+```
+docker exec -it sp-postgres psql -U sp_user -d software_press
+```
+
+Most useful is a query like `select * from jobs where id = '5271916F-456C-43C1-9B30-F85D57F238C6';`.
