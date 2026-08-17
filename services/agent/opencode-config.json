@@ -37,6 +37,7 @@
     "read": "allow",
     "grep": "allow",
     "glob": "allow",
+    "curl": "allow",
     "external_directory": {
       "/tmp/**": "allow"
     }

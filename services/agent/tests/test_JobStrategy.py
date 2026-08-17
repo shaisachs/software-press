@@ -78,7 +78,7 @@ def test_branch_name_for_issue():
     assert IssueResolveStrategy.branch_name_for_issue("Needs: Proper Casing!") == "feature/needs-proper-casing"
 
 
-def test_adhoc_prompt_strategy_operations_are_trivial(mocker):
+def test_adhoc_prompt_strategy_checks_out_workspace_branch(mocker):
     gh = make_gh(mocker)
     git = make_git(mocker)
     job = make_job(prompt="write hello world", type="adHoc", issue_number=None)
@@ -89,12 +89,41 @@ def test_adhoc_prompt_strategy_operations_are_trivial(mocker):
     strategy.setup_item_run()
     assert strategy.build_prompt() == "write hello world"
     assert strategy.commits_changes()
-    strategy.close_item_run()
 
+    git.resolve_branch.assert_called_once_with(None)
+    git.checkout_branch.assert_called_once_with("main")
     gh.fetch_issue.assert_not_called()
     git.create_branch.assert_not_called()
     git.push_to_origin.assert_not_called()
     gh.create_pull_request.assert_not_called()
+
+
+def test_adhoc_prompt_strategy_checks_out_requested_branch(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job = make_job(prompt="write hello world", type="adHoc", issue_number=None, branch="develop")
+    job_item = make_job_item(mocker, job, gh=gh, git=git)
+
+    strategy = AdHocPromptStrategy(job_item)
+
+    strategy.setup_item_run()
+
+    git.resolve_branch.assert_called_once_with("develop")
+    git.checkout_branch.assert_called_once_with("develop")
+
+
+def test_adhoc_prompt_strategy_reset_checks_out_workspace_branch(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job = make_job(prompt="write hello world", type="adHoc", issue_number=None)
+    job_item = make_job_item(mocker, job, gh=gh, git=git)
+
+    strategy = AdHocPromptStrategy(job_item)
+
+    strategy.reset_workspace()
+
+    git.resolve_branch.assert_called_once_with(None)
+    git.checkout_branch.assert_called_once_with("main")
 
 
 def test_fetch_issue_delegates_to_gh(mocker):
@@ -111,9 +140,9 @@ def test_create_branch_delegates_to_git(mocker):
     git = make_git(mocker)
     strategy = make_strategy(mocker, git=git)
 
-    result = strategy.create_branch("feature/x")
+    result = strategy.create_branch("feature/x", "main")
 
-    git.create_branch.assert_called_once_with("feature/x")
+    git.create_branch.assert_called_once_with("feature/x", "main")
     assert result is git.create_branch.return_value
 
 
@@ -162,8 +191,23 @@ def test_issue_resolve_setup_item_run_creates_branch(mocker):
     strategy.setup_item_run()
 
     gh.fetch_issue.assert_called_once_with(42)
-    git.create_branch.assert_called_once_with("feature/fix-the-bug")
-    assert strategy.default_branch == "main"
+    git.create_branch.assert_called_once_with("feature/fix-the-bug", "main")
+    assert strategy.base_branch == "main"
+    assert strategy.branch == "feature/fix-the-bug"
+
+
+def test_issue_resolve_setup_item_run_uses_requested_branch_as_base(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    git.create_branch.side_effect = lambda branch, base: (base, branch)
+    job = make_job(branch="develop")
+    strategy = make_strategy(mocker, gh=gh, git=git, job=job)
+
+    strategy.setup_item_run()
+
+    gh.fetch_issue.assert_called_once_with(42)
+    git.create_branch.assert_called_once_with("feature/fix-the-bug", "develop")
+    assert strategy.base_branch == "develop"
     assert strategy.branch == "feature/fix-the-bug"
 
 
@@ -179,7 +223,7 @@ def test_issue_resolve_build_prompt_from_issue(mocker):
     assert "the issue" in prompt
 
 
-def test_issue_resolve_close_item_run_creates_pr_and_checks_out(mocker):
+def test_issue_resolve_close_item_run_creates_pr(mocker):
     gh = make_gh(mocker)
     git = make_git(mocker)
     db = make_db(mocker)
@@ -191,10 +235,33 @@ def test_issue_resolve_close_item_run_creates_pr_and_checks_out(mocker):
     git.push_to_origin.assert_called_once_with("feature/fix-the-bug")
     gh.create_pull_request.assert_called_once_with("feature/fix-the-bug", "main", "Fix the bug", 42)
     db.record_pr_number.assert_called_once_with("abc-123", 99)
+    git.checkout_branch.assert_not_called()
+
+
+def test_issue_resolve_reset_workspace_checks_out_base_branch(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    strategy = make_strategy(mocker, gh=gh, git=git)
+
+    strategy.setup_item_run()
+    strategy.reset_workspace()
+
     git.checkout_branch.assert_called_once_with("main")
 
 
-def test_issue_architect_setup_item_run_is_trivial(mocker):
+def test_issue_resolve_reset_workspace_checks_out_requested_branch(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job = make_job(branch="develop")
+    strategy = make_strategy(mocker, gh=gh, git=git, job=job)
+
+    strategy.setup_item_run()
+    strategy.reset_workspace()
+
+    git.checkout_branch.assert_called_once_with("develop")
+
+
+def test_issue_architect_setup_item_run_checks_out_workspace_branch(mocker):
     gh = make_gh(mocker)
     git = make_git(mocker)
     strategy = make_architect_strategy(mocker, gh=gh, git=git)
@@ -203,6 +270,19 @@ def test_issue_architect_setup_item_run_is_trivial(mocker):
 
     gh.fetch_issue.assert_not_called()
     git.create_branch.assert_not_called()
+    git.checkout_branch.assert_called_once_with("main")
+
+
+def test_issue_architect_setup_item_run_checks_out_requested_branch(mocker):
+    gh = make_gh(mocker)
+    git = make_git(mocker)
+    job = make_job(type="issueArchitect", branch="develop")
+    strategy = make_architect_strategy(mocker, gh=gh, git=git, job=job)
+
+    strategy.setup_item_run()
+
+    git.resolve_branch.assert_called_once_with("develop")
+    git.checkout_branch.assert_called_once_with("develop")
 
 
 def test_issue_architect_does_not_commit_changes(mocker):

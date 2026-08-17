@@ -64,6 +64,8 @@ class JobItem:
     def run(self):
         self.strategy.setup_item_run()
         prompt = self.strategy.build_prompt()
+        self.command_runner.output_file.write(f"****\nPrompt: {prompt}\n****\n")
+
         output = self.run_prompt(prompt)
 
         if self.strategy.commits_changes():
@@ -75,6 +77,8 @@ class JobItem:
                 self.command_runner.output_file.write("No changes staged; skipping commit and pull request.\n")
         else:
             self.strategy.close_item_run(output)
+
+        self.strategy.reset_workspace()
 
     @staticmethod
     def _workspace_dir(repo: str) -> Path:

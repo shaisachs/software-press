@@ -194,7 +194,7 @@ def test_run_job_delegates_to_job_item(mocker, tmp_path):
     assert result is None
 
 
-def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatch):
+def test_run_job_writes_output_artifacts(mocker, tmp_path, monkeypatch):
     use_workspaces(monkeypatch, tmp_path)
     job = Job(job_id="abc-123", prompt="write hello world", repo=VALID_REPO, type="adHoc")
     command_runner = make_command_runner(mocker)
@@ -204,7 +204,6 @@ def test_run_job_writes_prompt_and_output_artifacts(mocker, tmp_path, monkeypatc
     runner.run_job(job_item)
 
     artifact_path = next((tmp_path / "artifacts").glob("*-abc-123"))
-    assert (artifact_path / "prompt.txt").read_text() == "write hello world"
     assert (artifact_path / "output.txt").exists()
 
 

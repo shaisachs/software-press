@@ -111,6 +111,39 @@ def test_model_rejects_invalid_formats():
             CreateJobRequest(prompt="hi", repo=VALID_REPO, model=model)
 
 
+def test_branch_defaults_to_none():
+    req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
+
+    assert req.branch is None
+
+
+def test_branch_accepts_valid_formats():
+    for branch in [
+        "main",
+        "develop",
+        "feature/new-thing",
+        "release/v1.2.0",
+        "bug-fix_123",
+    ]:
+        req = CreateJobRequest(prompt="hi", repo=VALID_REPO, branch=branch)
+        assert req.branch == branch
+
+
+def test_branch_rejects_invalid_formats():
+    for branch in [
+        "",
+        "with space",
+        "branch name",
+        "..",
+        "../evil",
+        "feature/",
+        "/feature",
+        "feature//nested",
+    ]:
+        with pytest.raises(ValidationError):
+            CreateJobRequest(prompt="hi", repo=VALID_REPO, branch=branch)
+
+
 def test_type_inferred_as_adhoc_from_prompt():
     req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
 

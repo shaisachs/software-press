@@ -66,11 +66,13 @@ A FastAPI service (port `8000`) that exposes:
 - `GET /health` - reports connectivity to Postgres and Redis.
 - `POST /jobs` - accepts a `prompt` (ad hoc), an `issueNumber` (GitHub issue),
   or both when paired with `type` (`issueArchitect`), plus an optional `model`
-  (`provider/model` format, e.g. `deepseek/deepseek-v4-pro`). Each job must
-  carry a `type`: `adHoc` (prompt only), `issueResolver` (issue number only),
-  or `issueArchitect` (issue number only, research only). If `type` is omitted
-  it is inferred from the payload. It creates a UUID job id, inserts a `queued`
-  row into Postgres, and pushes the job id onto the Redis `jobs` queue.
+  (`provider/model` format, e.g. `deepseek/deepseek-v4-pro`) and an optional
+  `branch` (a repo branch to work on; defaults to the repo's default branch when
+  omitted). Each job must carry a `type`: `adHoc` (prompt only),
+  `issueResolver` (issue number only), or `issueArchitect` (issue number only,
+  research only). If `type` is omitted it is inferred from the payload. It
+  creates a UUID job id, inserts a `queued` row into Postgres, and pushes the
+  job id onto the Redis `jobs` queue.
 - `GET /jobs/{job_id}` - returns the job's status, prompt, error, artifact
   path, pull request number, and type.
 
@@ -86,18 +88,23 @@ Redis `jobs` queue. For each job it:
    (`app/GithubClient.py`) and builds a prompt.
 4. Creates an artifact directory under `ARTIFACT_ROOT` (e.g.
    `artifacts/20260811180005-<job_id>/`) and marks the job `running`.
-5. Runs `opencode run --agent build --model <model> "<prompt>"` in the repo's
+5. Checks out the job's target branch (the requested `branch`, or the repo's
+   default branch when omitted) before running opencode - failing the job if
+   that branch can't be checked out.
+6. Runs `opencode run --agent build --model <model> "<prompt>"` in the repo's
    working directory (`app/JobItem.py:run_prompt`). Command output is streamed
    to `output.txt`.
-6. Stages and commits any changes (`app/GitClient.py`). A `prepare-commit-msg`
+7. Stages and commits any changes (`app/GitClient.py`). A `prepare-commit-msg`
    git hook invokes opencode again to auto-generate a Conventional Commits
    message.
-7. For `issueResolver` jobs: pushes the `feature/...` branch to origin and
-   creates a pull request via `gh pr create`; for `issueArchitect` jobs: posts
-   the agent's proposal as a comment on the issue (`gh issue comment`) and makes
-   no code changes; for ad hoc jobs it only commits locally.
-8. Records `completed`/`failed` status, any error, and the PR number in
-   Postgres.
+8. For `issueResolver` jobs: pushes the `feature/...` branch to origin and
+   creates a pull request via `gh pr create` (based on the target branch); for
+   `issueArchitect` jobs: posts the agent's proposal as a comment on the issue
+   (`gh issue comment`) and makes no code changes; for ad hoc jobs it only
+   commits locally.
+9. Checks out the target branch once more to reset the workspace.
+10. Records `completed`/`failed` status, any error, and the PR number in
+    Postgres.
 
 ### sp-db-migrate - database migrations
 
@@ -110,7 +117,7 @@ migrations as already applied without running them.
 
 ### sp-postgres - job store
 
-Postgres 16 holding the `jobs` table (schema in `migrations/001..006`):
+Postgres 16 holding the `jobs` table (schema in `migrations/001..007`):
 
 | column | purpose |
 | --- | --- |
@@ -119,6 +126,7 @@ Postgres 16 holding the `jobs` table (schema in `migrations/001..006`):
 | `issue_number` | GitHub issue to resolve, if any |
 | `repo` | `org/repo` targeted by the job |
 | `model` | requested `provider/model`, optional |
+| `branch` | repo branch to check out for the job, optional (defaults to the repo's default branch) |
 | `type` | `adHoc` / `issueResolver` / `issueArchitect` |
 | `status` | `queued` / `running` / `completed` / `failed` |
 | `artifact_path` | artifact directory for the job |
