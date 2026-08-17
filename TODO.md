@@ -6,3 +6,4 @@
 - [x] automatically do all migrations that are not-done when postgres starts up
 - [x] real mocking setup for unit tests
 - [ ] recombine JobRunner and JobItem? JobItem is a pretty weird abstraction.
+- [ ] extend functional tests to cover the full api -> redis -> agent cycle (the agent is not yet exercised by the functional suite)

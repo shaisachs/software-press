@@ -9,6 +9,7 @@ status=0
 
 test_in_docker() {
   local name="$1"
+  local tests_dir="$2"
   local image="software-press-tests-$name"
 
   echo "==> $name: building test image"
@@ -21,10 +22,10 @@ COPY . .
 DOCKERFILE
 
   echo "==> $name: running tests"
-  docker run --rm -w /app "$image" python3 -m pytest tests -q || status=1
+  docker run --rm -w /app "$image" python3 -m pytest "$tests_dir" -q || status=1
 }
 
-test_in_docker agent
-test_in_docker api
+test_in_docker agent tests
+test_in_docker api tests/unit
 
 exit $status

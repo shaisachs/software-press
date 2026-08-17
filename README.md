@@ -88,11 +88,33 @@ The Qwen model is quite underpowered so it is not recommended for daily coding, 
 
 The Deepseek models require API keys. Flash is recommended for lightweight tasks, Pro for more heavy-duty tasks. Flash is the default.
 
-## Tests
+## Unit Tests
 
 Run the unit tests for both services:
 
-`scripts/test.sh`
+`scripts/test-unit.sh`
+
+### Functional tests
+
+Run the functional test suite, which exercises the *real* API against throwaway
+Postgres and Redis containers (no mocks):
+
+`scripts/test-functional.sh`
+
+The script stands up throwaway `postgres-test` and `redis-test` containers,
+applies all migrations (via the same `scripts/migrate.sh` path used in
+production), boots the real API, and runs a [Karate](https://karate.io) suite
+(`services/api/tests/functional/`) against it. Because the dependencies are real, the
+Karate scenarios can assert state the API cannot see over HTTP:
+
+* row-level assertions against Postgres (via JDBC through a small
+  `karatehelpers.DbUtils` helper), and
+* direct queue-membership checks against Redis (via jedis).
+
+The suite exits non-zero on any failure, and a GitHub Actions workflow
+(`.github/workflows/functional-tests.yml`) runs it as a gate on push / pull
+request, so functional test breaks are visible before the API image is built or
+pushed.
 
 ## Debugging
 
