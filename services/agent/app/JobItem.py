@@ -64,6 +64,8 @@ class JobItem:
     def run(self):
         self.strategy.setup_item_run()
         prompt = self.strategy.build_prompt()
+        self.command_runner.output_file.write(f"****\nPrompt: {prompt}\n****\n")
+
         output = self.run_prompt(prompt)
 
         if self.strategy.commits_changes():
