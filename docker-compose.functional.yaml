@@ -1,0 +1,71 @@
+name: software-press-functional
+
+services:
+  postgres-test:
+    image: postgres:16
+    container_name: sp-test-postgres
+    environment:
+      POSTGRES_USER: sp_user
+      POSTGRES_PASSWORD: sp_password
+      POSTGRES_DB: software_press
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sp_user -d software_press"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-test:
+    image: redis:7
+    container_name: sp-test-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  db-migrate-test:
+    image: python:3.11-slim
+    container_name: sp-test-db-migrate
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+      - ./scripts:/scripts
+    environment:
+      DATABASE_URL: postgresql://sp_user:sp_password@postgres-test:5432/software_press
+    entrypoint: ["/bin/sh", "/scripts/migrate.sh"]
+
+  api-test:
+    build: ./services/api
+    container_name: sp-test-api
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      db-migrate-test:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_HOST: postgres-test
+      POSTGRES_DB: software_press
+      POSTGRES_USER: sp_user
+      POSTGRES_PASSWORD: sp_password
+      REDIS_HOST: redis-test
+      REDIS_URL: redis://redis-test:6379
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  karate-runner:
+    build: ./functional_tests/karate
+    depends_on:
+      api-test:
+        condition: service_healthy
+    volumes:
+      - ./functional_tests/karate:/tests
+    working_dir: /tests
+    command: ["/tests"]

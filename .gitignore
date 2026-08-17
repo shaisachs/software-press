@@ -7,3 +7,4 @@ workspaces/
 services/agent/id_rsa
 __pycache__
 .pytest_cache/
+functional_tests/karate/target/

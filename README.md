@@ -92,6 +92,28 @@ Run the unit tests for both services:
 
 `scripts/test.sh`
 
+### Functional tests
+
+Run the functional test suite, which exercises the *real* API against throwaway
+Postgres and Redis containers (no mocks):
+
+`scripts/test-functional.sh`
+
+The script stands up throwaway `postgres-test` and `redis-test` containers,
+applies all migrations (via the same `scripts/migrate.sh` path used in
+production), boots the real API, and runs a [Karate](https://karate.io) suite
+(`functional_tests/karate/`) against it. Because the dependencies are real, the
+Karate scenarios can assert state the API cannot see over HTTP:
+
+* row-level assertions against Postgres (via JDBC through a small
+  `karatehelpers.DbUtils` helper), and
+* direct queue-membership checks against Redis (via jedis).
+
+The suite exits non-zero on any failure, and a GitHub Actions workflow
+(`.github/workflows/functional-tests.yml`) runs it as a gate on push / pull
+request, so functional test breaks are visible before the API image is built or
+pushed.
+
 ## Debugging
 
 Test ollama connectivity from within the sp-agent container:
