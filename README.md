@@ -86,11 +86,11 @@ The Qwen model is quite underpowered so it is not recommended for daily coding, 
 
 The Deepseek models require API keys. Flash is recommended for lightweight tasks, Pro for more heavy-duty tasks. Flash is the default.
 
-## Tests
+## Unit Tests
 
 Run the unit tests for both services:
 
-`scripts/test.sh`
+`scripts/test-unit.sh`
 
 ### Functional tests
 
