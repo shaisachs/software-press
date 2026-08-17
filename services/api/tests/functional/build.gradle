@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.softwarepress'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    // Karate runner (the standalone CLI class com.intuit.karate.Main) plus the
+    // jars the feature files need at runtime: the PostgreSQL JDBC driver (for
+    // row-level assertions via DbUtils) and Jedis (for direct Redis queue
+    // membership checks).
+    implementation 'io.karatelabs:karate-core:1.5.2'
+    runtimeOnly 'org.postgresql:postgresql:42.7.4'
+    runtimeOnly 'redis.clients:jedis:5.1.0'
+}
+
+application {
+    mainClass = 'com.intuit.karate.Main'
+}

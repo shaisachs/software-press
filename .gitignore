@@ -8,3 +8,5 @@ services/agent/id_rsa
 __pycache__
 .pytest_cache/
 services/api/tests/functional/target/
+services/api/tests/functional/build/
+services/api/tests/functional/.gradle/
