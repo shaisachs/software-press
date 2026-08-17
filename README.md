@@ -35,7 +35,7 @@ curl -X POST http://localhost:8000/jobs \
     }'
 ```
 
-The `type` field is optional; when omitted it is inferred from the request (`adHoc` for a prompt, `issueResolver` for an issue number).
+The `type` field is required and must be one of `adHoc`, `issueResolver`, or `issueArchitect`. `adHoc` jobs require a `prompt`; `issueResolver` and `issueArchitect` jobs require an `issueNumber`.
 
 The `branch` field is optional. If omitted, the repo's default branch is used. The agent checks out that branch before doing any work, and checks it back out again when it is done to reset the workspace. If the branch specified can't be checked out, the job will fail before doing any work.
 

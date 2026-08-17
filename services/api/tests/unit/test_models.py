@@ -7,7 +7,7 @@ VALID_REPO = "shaisachs/laws-of-software"
 
 
 def test_prompt_only_is_valid():
-    req = CreateJobRequest(prompt="write hello world", repo=VALID_REPO)
+    req = CreateJobRequest(type="adHoc", prompt="write hello world", repo=VALID_REPO)
 
     assert req.prompt == "write hello world"
     assert req.issueNumber is None
@@ -15,7 +15,7 @@ def test_prompt_only_is_valid():
 
 
 def test_issue_number_only_is_valid():
-    req = CreateJobRequest(issueNumber=42, repo=VALID_REPO)
+    req = CreateJobRequest(type="issueResolver", issueNumber=42, repo=VALID_REPO)
 
     assert req.issueNumber == 42
     assert req.prompt is None
@@ -24,7 +24,7 @@ def test_issue_number_only_is_valid():
 
 def test_repo_required():
     with pytest.raises(ValidationError):
-        CreateJobRequest(prompt="write hello world")
+        CreateJobRequest(type="adHoc", prompt="write hello world")
 
 
 def test_repo_accepts_owner_and_repo_names():
@@ -35,7 +35,7 @@ def test_repo_accepts_owner_and_repo_names():
         "acme/repo.with.dots",
         "A-Cme/UPPER_case",
     ]:
-        req = CreateJobRequest(prompt="hi", repo=repo)
+        req = CreateJobRequest(type="adHoc", prompt="hi", repo=repo)
         assert req.repo == repo
 
 
@@ -51,38 +51,52 @@ def test_repo_rejects_invalid_formats():
         "own$er/repo",
     ]:
         with pytest.raises(ValidationError):
-            CreateJobRequest(prompt="hi", repo=repo)
+            CreateJobRequest(type="adHoc", prompt="hi", repo=repo)
 
 
-def test_neither_prompt_nor_issue_raises():
+def test_type_is_required():
     with pytest.raises(ValidationError) as exc_info:
-        CreateJobRequest(repo=VALID_REPO)
+        CreateJobRequest(prompt="hi", repo=VALID_REPO)
+
+    assert "type" in str(exc_info.value)
+
+
+def test_adhoc_type_requires_prompt():
+    with pytest.raises(ValidationError) as exc_info:
+        CreateJobRequest(type="adHoc", repo=VALID_REPO)
+
+    assert "adHoc job requires a 'prompt'" in str(exc_info.value)
+
+
+def test_issue_resolver_type_requires_issue_number():
+    with pytest.raises(ValidationError) as exc_info:
+        CreateJobRequest(type="issueResolver", repo=VALID_REPO)
 
     assert "issueResolver job requires an 'issueNumber'" in str(exc_info.value)
 
 
 def test_both_prompt_and_issue_raises():
     with pytest.raises(ValidationError) as exc_info:
-        CreateJobRequest(prompt="hi", issueNumber=1, repo=VALID_REPO)
+        CreateJobRequest(type="adHoc", prompt="hi", issueNumber=1, repo=VALID_REPO)
 
     assert "adHoc job must not have an 'issueNumber'" in str(exc_info.value)
 
 
 def test_issue_number_must_be_positive():
     with pytest.raises(ValidationError):
-        CreateJobRequest(issueNumber=0, repo=VALID_REPO)
+        CreateJobRequest(type="issueResolver", issueNumber=0, repo=VALID_REPO)
 
     with pytest.raises(ValidationError):
-        CreateJobRequest(issueNumber=-5, repo=VALID_REPO)
+        CreateJobRequest(type="issueResolver", issueNumber=-5, repo=VALID_REPO)
 
 
 def test_issue_number_must_be_int():
     with pytest.raises(ValidationError):
-        CreateJobRequest(issueNumber="not a number", repo=VALID_REPO)
+        CreateJobRequest(type="issueResolver", issueNumber="not a number", repo=VALID_REPO)
 
 
 def test_model_defaults_to_none():
-    req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
+    req = CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO)
 
     assert req.model is None
 
@@ -94,7 +108,7 @@ def test_model_accepts_valid_formats():
         "sp-ollama/qwen2.5:0.5b",
         "acme/model.with.dots",
     ]:
-        req = CreateJobRequest(prompt="hi", repo=VALID_REPO, model=model)
+        req = CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO, model=model)
         assert req.model == model
 
 
@@ -108,11 +122,11 @@ def test_model_rejects_invalid_formats():
         "provider/model name",
     ]:
         with pytest.raises(ValidationError):
-            CreateJobRequest(prompt="hi", repo=VALID_REPO, model=model)
+            CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO, model=model)
 
 
 def test_branch_defaults_to_none():
-    req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
+    req = CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO)
 
     assert req.branch is None
 
@@ -125,7 +139,7 @@ def test_branch_accepts_valid_formats():
         "release/v1.2.0",
         "bug-fix_123",
     ]:
-        req = CreateJobRequest(prompt="hi", repo=VALID_REPO, branch=branch)
+        req = CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO, branch=branch)
         assert req.branch == branch
 
 
@@ -141,22 +155,10 @@ def test_branch_rejects_invalid_formats():
         "feature//nested",
     ]:
         with pytest.raises(ValidationError):
-            CreateJobRequest(prompt="hi", repo=VALID_REPO, branch=branch)
+            CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO, branch=branch)
 
 
-def test_type_inferred_as_adhoc_from_prompt():
-    req = CreateJobRequest(prompt="hi", repo=VALID_REPO)
-
-    assert req.type == "adHoc"
-
-
-def test_type_inferred_as_issue_resolver_from_issue_number():
-    req = CreateJobRequest(issueNumber=42, repo=VALID_REPO)
-
-    assert req.type == "issueResolver"
-
-
-def test_explicit_adhoc_type_with_prompt_is_valid():
+def test_adhoc_type_with_prompt_is_valid():
     req = CreateJobRequest(type="adHoc", prompt="hi", repo=VALID_REPO)
 
     assert req.type == "adHoc"
@@ -164,14 +166,14 @@ def test_explicit_adhoc_type_with_prompt_is_valid():
     assert req.issueNumber is None
 
 
-def test_explicit_adhoc_type_with_issue_number_raises():
+def test_adhoc_type_with_issue_number_raises():
     with pytest.raises(ValidationError) as exc_info:
         CreateJobRequest(type="adHoc", issueNumber=42, repo=VALID_REPO)
 
     assert "adHoc job requires a 'prompt'" in str(exc_info.value)
 
 
-def test_explicit_issue_resolver_type_with_issue_number_is_valid():
+def test_issue_resolver_type_with_issue_number_is_valid():
     req = CreateJobRequest(type="issueResolver", issueNumber=42, repo=VALID_REPO)
 
     assert req.type == "issueResolver"
@@ -179,14 +181,14 @@ def test_explicit_issue_resolver_type_with_issue_number_is_valid():
     assert req.prompt is None
 
 
-def test_explicit_issue_resolver_type_with_prompt_raises():
+def test_issue_resolver_type_with_prompt_raises():
     with pytest.raises(ValidationError) as exc_info:
         CreateJobRequest(type="issueResolver", prompt="hi", repo=VALID_REPO)
 
     assert "issueResolver job requires an 'issueNumber'" in str(exc_info.value)
 
 
-def test_explicit_issue_architect_type_with_issue_number_is_valid():
+def test_issue_architect_type_with_issue_number_is_valid():
     req = CreateJobRequest(type="issueArchitect", issueNumber=42, repo=VALID_REPO)
 
     assert req.type == "issueArchitect"
@@ -194,7 +196,7 @@ def test_explicit_issue_architect_type_with_issue_number_is_valid():
     assert req.prompt is None
 
 
-def test_explicit_issue_architect_type_with_prompt_raises():
+def test_issue_architect_type_with_prompt_raises():
     with pytest.raises(ValidationError) as exc_info:
         CreateJobRequest(type="issueArchitect", prompt="hi", issueNumber=42, repo=VALID_REPO)
 

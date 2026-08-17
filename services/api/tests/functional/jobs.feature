@@ -12,7 +12,7 @@ Feature: Jobs API against real Postgres and Redis
     * def closed = jedis.close()
 
   Scenario: create an adHoc job and verify the Postgres row and Redis queue membership
-    * def payload = { repo: 'example/foobar', prompt: 'Write a hello world script', model: 'deepseek/deepseek-v4-flash' }
+    * def payload = { repo: 'example/foobar', type: 'adHoc', prompt: 'Write a hello world script', model: 'deepseek/deepseek-v4-flash' }
     Given url baseUrl
     And path 'jobs'
     And request payload
@@ -54,7 +54,7 @@ Feature: Jobs API against real Postgres and Redis
     * def closed = jedis.close()
 
   Scenario: create an issueResolver job and verify the Postgres row and Redis queue membership
-    * def payload = { repo: 'example/foobar', issueNumber: 42 }
+    * def payload = { repo: 'example/foobar', type: 'issueResolver', issueNumber: 42 }
     Given url baseUrl
     And path 'jobs'
     And request payload
@@ -130,7 +130,7 @@ Feature: Jobs API against real Postgres and Redis
     * def closed = jedis.close()
 
   Scenario: create an adHoc job with an explicit custom model and verify the row and queue
-    * def payload = { repo: 'example/foobar', prompt: 'Write a poem', model: 'deepseek/deepseek-v4-pro' }
+    * def payload = { repo: 'example/foobar', type: 'adHoc', prompt: 'Write a poem', model: 'deepseek/deepseek-v4-pro' }
     Given url baseUrl
     And path 'jobs'
     And request payload
@@ -177,35 +177,42 @@ Feature: Jobs API against real Postgres and Redis
     # Missing repo.
     Given url baseUrl
     And path 'jobs'
-    And request { prompt: 'hello' }
+    And request { type: 'adHoc', prompt: 'hello' }
     When method post
     Then status 400
 
-    # No prompt and no issueNumber - the job type cannot be inferred.
+    # Missing type.
     Given url baseUrl
     And path 'jobs'
     And request { repo: 'example/foobar' }
     When method post
     Then status 400
 
+    # A type is present but its required field is missing.
+    Given url baseUrl
+    And path 'jobs'
+    And request { repo: 'example/foobar', type: 'issueResolver' }
+    When method post
+    Then status 400
+
     # Malformed model (not provider/model).
     Given url baseUrl
     And path 'jobs'
-    And request { repo: 'example/foobar', prompt: 'hello', model: 'not-a-model' }
+    And request { repo: 'example/foobar', type: 'adHoc', prompt: 'hello', model: 'not-a-model' }
     When method post
     Then status 400
 
     # issueNumber must be positive.
     Given url baseUrl
     And path 'jobs'
-    And request { repo: 'example/foobar', issueNumber: 0 }
+    And request { repo: 'example/foobar', type: 'issueResolver', issueNumber: 0 }
     When method post
     Then status 400
 
     # An adHoc prompt cannot be combined with an issueNumber.
     Given url baseUrl
     And path 'jobs'
-    And request { repo: 'example/foobar', prompt: 'hello', issueNumber: 42 }
+    And request { repo: 'example/foobar', type: 'adHoc', prompt: 'hello', issueNumber: 42 }
     When method post
     Then status 400
 

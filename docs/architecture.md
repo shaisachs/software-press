@@ -70,7 +70,7 @@ A FastAPI service (port `8000`) that exposes:
   `branch` (a repo branch to work on; defaults to the repo's default branch when
   omitted). Each job must carry a `type`: `adHoc` (prompt only),
   `issueResolver` (issue number only), or `issueArchitect` (issue number only,
-  research only). If `type` is omitted it is inferred from the payload. It
+  research only). The job's strategy is selected purely from `type`. It
   creates a UUID job id, inserts a `queued` row into Postgres, and pushes the
   job id onto the Redis `jobs` queue.
 - `GET /jobs/{job_id}` - returns the job's status, prompt, error, artifact
@@ -184,11 +184,11 @@ config) before running.
 ```
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
-    -d '{"repo": "example/foobar", "prompt": "Write a hello world script", "model": "deepseek/deepseek-v4-pro"}'
+    -d '{"type": "adHoc", "repo": "example/foobar", "prompt": "Write a hello world script", "model": "deepseek/deepseek-v4-pro"}'
 
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \
-    -d '{"repo": "example/foobar", "issueNumber": 42}'
+    -d '{"type": "issueResolver", "repo": "example/foobar", "issueNumber": 42}'
 
 curl -X POST http://localhost:8000/jobs \
     -H "Content-Type: application/json" \

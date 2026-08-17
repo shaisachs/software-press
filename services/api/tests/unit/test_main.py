@@ -27,7 +27,9 @@ def test_health_reflects_redis_ping_result(client, mocked_deps):
 
 
 def test_create_job_with_prompt(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "write hello world", "repo": VALID_REPO})
+    resp = client.post(
+        "/jobs", json={"type": "adHoc", "prompt": "write hello world", "repo": VALID_REPO}
+    )
 
     assert resp.status_code == 200
     body = resp.json()
@@ -44,7 +46,9 @@ def test_create_job_with_prompt(client, mocked_deps):
 
 
 def test_create_job_with_issue_number(client, mocked_deps):
-    resp = client.post("/jobs", json={"issueNumber": 42, "repo": VALID_REPO})
+    resp = client.post(
+        "/jobs", json={"type": "issueResolver", "issueNumber": 42, "repo": VALID_REPO}
+    )
 
     assert resp.status_code == 200
     body = resp.json()
@@ -78,7 +82,12 @@ def test_create_job_with_issue_architect(client, mocked_deps):
 def test_create_job_with_model(client, mocked_deps):
     resp = client.post(
         "/jobs",
-        json={"prompt": "write hello world", "repo": VALID_REPO, "model": "deepseek/deepseek-v4-pro"},
+        json={
+            "type": "adHoc",
+            "prompt": "write hello world",
+            "repo": VALID_REPO,
+            "model": "deepseek/deepseek-v4-pro",
+        },
     )
 
     assert resp.status_code == 200
@@ -96,7 +105,12 @@ def test_create_job_with_model(client, mocked_deps):
 def test_create_job_with_branch(client, mocked_deps):
     resp = client.post(
         "/jobs",
-        json={"prompt": "write hello world", "repo": VALID_REPO, "branch": "develop"},
+        json={
+            "type": "adHoc",
+            "prompt": "write hello world",
+            "repo": VALID_REPO,
+            "branch": "develop",
+        },
     )
 
     assert resp.status_code == 200
@@ -112,7 +126,7 @@ def test_create_job_with_branch(client, mocked_deps):
 
 
 def test_create_job_rejects_missing_repo(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "write hello world"})
+    resp = client.post("/jobs", json={"type": "adHoc", "prompt": "write hello world"})
 
     assert resp.status_code == 400
     mocked_deps["cursor"].execute.assert_not_called()
@@ -120,7 +134,9 @@ def test_create_job_rejects_missing_repo(client, mocked_deps):
 
 
 def test_create_job_rejects_invalid_repo(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "write hello world", "repo": "not-a-repo"})
+    resp = client.post(
+        "/jobs", json={"type": "adHoc", "prompt": "write hello world", "repo": "not-a-repo"}
+    )
 
     assert resp.status_code == 400
     mocked_deps["cursor"].execute.assert_not_called()
@@ -131,7 +147,7 @@ def test_create_job_rejects_invalid_model(client, mocked_deps):
     for model in ["", "no-slash", "provider/", "/model", "provider/model/extra", "provider/model name"]:
         resp = client.post(
             "/jobs",
-            json={"prompt": "write hello world", "repo": VALID_REPO, "model": model},
+            json={"type": "adHoc", "prompt": "write hello world", "repo": VALID_REPO, "model": model},
         )
 
         assert resp.status_code == 400
@@ -143,7 +159,7 @@ def test_create_job_rejects_invalid_branch(client, mocked_deps):
     for branch in ["", "with space", "../evil", "branch name", "-leading"]:
         resp = client.post(
             "/jobs",
-            json={"prompt": "write hello world", "repo": VALID_REPO, "branch": branch},
+            json={"type": "adHoc", "prompt": "write hello world", "repo": VALID_REPO, "branch": branch},
         )
 
         assert resp.status_code == 400
@@ -151,16 +167,32 @@ def test_create_job_rejects_invalid_branch(client, mocked_deps):
         mocked_deps["enqueue_job"].assert_not_called()
 
 
-def test_create_job_rejects_missing_prompt_and_issue(client, mocked_deps):
-    resp = client.post("/jobs", json={"repo": VALID_REPO})
+def test_create_job_rejects_missing_type(client, mocked_deps):
+    resp = client.post("/jobs", json={"prompt": "write hello world", "repo": VALID_REPO})
 
     assert resp.status_code == 400
+    assert "type" in str(resp.json()["detail"])
     mocked_deps["cursor"].execute.assert_not_called()
     mocked_deps["enqueue_job"].assert_not_called()
 
 
+def test_create_job_rejects_type_without_its_required_field(client, mocked_deps):
+    for payload in [
+        {"type": "adHoc", "repo": VALID_REPO},
+        {"type": "issueResolver", "repo": VALID_REPO},
+        {"type": "issueArchitect", "repo": VALID_REPO},
+    ]:
+        resp = client.post("/jobs", json=payload)
+
+        assert resp.status_code == 400
+        mocked_deps["cursor"].execute.assert_not_called()
+        mocked_deps["enqueue_job"].assert_not_called()
+
+
 def test_create_job_rejects_both_prompt_and_issue(client, mocked_deps):
-    resp = client.post("/jobs", json={"prompt": "hi", "issueNumber": 1, "repo": VALID_REPO})
+    resp = client.post(
+        "/jobs", json={"type": "adHoc", "prompt": "hi", "issueNumber": 1, "repo": VALID_REPO}
+    )
 
     assert resp.status_code == 400
     assert "adHoc job must not have an 'issueNumber'" in str(resp.json()["detail"])
@@ -168,7 +200,9 @@ def test_create_job_rejects_both_prompt_and_issue(client, mocked_deps):
 
 
 def test_create_job_rejects_non_positive_issue_number(client, mocked_deps):
-    resp = client.post("/jobs", json={"issueNumber": 0, "repo": VALID_REPO})
+    resp = client.post(
+        "/jobs", json={"type": "issueResolver", "issueNumber": 0, "repo": VALID_REPO}
+    )
 
     assert resp.status_code == 400
     mocked_deps["enqueue_job"].assert_not_called()
